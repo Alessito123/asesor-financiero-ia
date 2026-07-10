@@ -83,6 +83,13 @@ La carpeta `vercel_frontend/` contiene una pantalla web ligera que consume el en
 BACKEND_URL=https://tu-backend-render.onrender.com
 ```
 
+Despliegue actual:
+
+- Frontend Vercel: https://vercelfrontend-peach.vercel.app
+- API temporal Vercel: https://deploybackend-mu.vercel.app
+
+Para cumplir estrictamente la indicacion del docente, el backend debe publicarse en Render conectando este repositorio y usando `render.yaml`.
+
 ## Artículo científico
 
 El avance del artículo está en:

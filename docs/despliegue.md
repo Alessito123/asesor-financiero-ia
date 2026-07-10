@@ -14,6 +14,14 @@ Start Command: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 
 Si vas a subir `models/best_model.keras` y consumir el modelo neuronal real, usa `pip install -r requirements.txt` para incluir TensorFlow.
 
+Backend temporal desplegado en Vercel para demo publica:
+
+```text
+https://deploybackend-mu.vercel.app
+```
+
+Cuando tengas el repositorio en GitHub, Render puede crear el servicio desde `render.yaml`.
+
 5. Configurar variables de entorno si aplica:
 
 ```text
@@ -39,6 +47,18 @@ Streamlit no es el despliegue natural de Vercel porque necesita un proceso Pytho
 ## Frontend auxiliar en Vercel
 
 La carpeta `vercel_frontend/` incluye una pantalla HTML/JS que consume el backend FastAPI.
+
+Despliegue realizado:
+
+```text
+https://vercelfrontend-peach.vercel.app
+```
+
+El frontend actualmente consume:
+
+```text
+https://deploybackend-mu.vercel.app
+```
 
 En Vercel:
 
