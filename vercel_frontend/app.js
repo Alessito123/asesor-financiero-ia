@@ -1,4 +1,6 @@
-const backendUrl = "http://localhost:8000";
+const backendUrl =
+  window.BACKEND_URL ||
+  "https://REEMPLAZAR-CON-TU-BACKEND-RENDER.onrender.com";
 const amountFields = document.querySelector("#amount-fields");
 const result = document.querySelector("#result");
 const statusBox = document.querySelector("#status");

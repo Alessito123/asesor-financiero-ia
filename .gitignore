@@ -26,6 +26,7 @@ outputs/*
 *.log
 *.tmp
 *.bak
+~$*.docx
 
 .DS_Store
 Thumbs.db
