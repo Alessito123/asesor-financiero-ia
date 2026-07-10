@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 from typing import Iterable, List
 
+import pandas as pd
 from docx import Document
 from docx.enum.section import WD_SECTION
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
@@ -15,6 +17,8 @@ from docx.shared import Inches, Pt, RGBColor
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
+OUTPUTS = ROOT / "outputs"
+MODELS = ROOT / "models"
 OUTPUT = DOCS / "articulo_cientifico_asesor_financiero_ia.docx"
 
 BLUE = RGBColor(46, 116, 181)
@@ -23,6 +27,95 @@ MUTED = RGBColor(89, 89, 89)
 LIGHT_FILL = "F4F6F9"
 HEADER_FILL = "E8EEF5"
 BORDER = "B7C4D6"
+
+
+def fmt_decimal(value: object, digits: int = 3) -> str:
+    try:
+        return f"{float(value):.{digits}f}"
+    except (TypeError, ValueError):
+        return "Pendiente"
+
+
+def fmt_seconds(value: object) -> str:
+    try:
+        return f"{float(value):.2f} s"
+    except (TypeError, ValueError):
+        return "Pendiente"
+
+
+def load_metadata() -> dict:
+    path = MODELS / "model_metadata.json"
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return {}
+
+
+def comparison_rows() -> List[List[str]]:
+    path = OUTPUTS / "model_comparison.csv"
+    if not path.exists():
+        return [
+            ["MLP", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"],
+            ["LSTM", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"],
+            ["GRU", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"],
+            ["CNN-LSTM", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"],
+            ["LSTM-Attention", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"],
+        ]
+
+    df = pd.read_csv(path)
+    rows: List[List[str]] = []
+    for _, row in df.iterrows():
+        rows.append(
+            [
+                str(row.get("model", "")),
+                fmt_decimal(row.get("accuracy_mean")),
+                fmt_decimal(row.get("precision_mean")),
+                fmt_decimal(row.get("recall_mean")),
+                fmt_decimal(row.get("f1_mean")),
+                fmt_decimal(row.get("roc_auc_mean")),
+                fmt_seconds(row.get("fit_seconds_mean")),
+            ]
+        )
+    return rows
+
+
+def tuning_rows() -> List[List[str]]:
+    path = OUTPUTS / "hyperparameter_tuning.csv"
+    if not path.exists():
+        return [["Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"]]
+
+    df = pd.read_csv(path).sort_values("roc_auc", ascending=False)
+    rows: List[List[str]] = []
+    for _, row in df.iterrows():
+        rows.append(
+            [
+                str(row.get("model", "")),
+                fmt_decimal(row.get("learning_rate"), 4),
+                str(int(row.get("batch_size", 0))),
+                fmt_decimal(row.get("roc_auc")),
+                fmt_seconds(row.get("fit_seconds")),
+            ]
+        )
+    return rows
+
+
+def statistical_rows() -> List[List[str]]:
+    path = OUTPUTS / "statistical_tests.csv"
+    if not path.exists():
+        return [["Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"]]
+
+    df = pd.read_csv(path)
+    rows: List[List[str]] = []
+    for _, row in df.iterrows():
+        rows.append(
+            [
+                str(row.get("model", "")),
+                str(row.get("baseline", "")),
+                fmt_decimal(row.get("paired_t_pvalue"), 4),
+                fmt_decimal(row.get("wilcoxon_pvalue"), 4),
+                "Significativo" if float(row.get("paired_t_pvalue", 1)) < 0.05 else "No concluyente",
+            ]
+        )
+    return rows
 
 
 def set_cell_shading(cell, fill: str) -> None:
@@ -233,6 +326,9 @@ def build_document() -> None:
     DOCS.mkdir(parents=True, exist_ok=True)
     doc = Document()
     configure_styles(doc)
+    metadata = load_metadata()
+    final_metrics = metadata.get("final_metrics", {})
+    best_model = metadata.get("best_model", "Pendiente")
     add_cover(doc)
 
     doc.add_heading("Resumen", level=1)
@@ -247,13 +343,25 @@ def build_document() -> None:
         "CNN-LSTM y LSTM con mecanismo de atencion. El sistema se implementa en Python con Streamlit para "
         "el dashboard y FastAPI para el consumo del mejor modelo entrenado."
     )
-    add_para(
-        doc,
-        "El avance incluye la arquitectura del proyecto, el pipeline reproducible de EDA, entrenamiento, "
-        "validacion cruzada de 5 folds, tuning de hiperparametros, pruebas estadisticas robustas y reportes "
-        "en PDF, Word y Excel. Las metricas finales no se reportan como valores cerrados en este documento "
-        "porque deben generarse al ejecutar el pipeline con el dataset publico en el entorno del equipo."
-    )
+    if final_metrics:
+        add_para(
+            doc,
+            "El avance incluye la arquitectura del proyecto, el pipeline reproducible de EDA, entrenamiento, "
+            "validacion cruzada de 5 folds, tuning de hiperparametros, pruebas estadisticas robustas y reportes "
+            "en PDF, Word y Excel. En la corrida registrada, el mejor modelo fue "
+            f"{best_model}, con AUC-ROC final de {fmt_decimal(final_metrics.get('roc_auc'))}, "
+            f"accuracy de {fmt_decimal(final_metrics.get('accuracy'))}, precision de "
+            f"{fmt_decimal(final_metrics.get('precision'))}, recall de {fmt_decimal(final_metrics.get('recall'))} "
+            f"y F1-score de {fmt_decimal(final_metrics.get('f1'))}."
+        )
+    else:
+        add_para(
+            doc,
+            "El avance incluye la arquitectura del proyecto, el pipeline reproducible de EDA, entrenamiento, "
+            "validacion cruzada de 5 folds, tuning de hiperparametros, pruebas estadisticas robustas y reportes "
+            "en PDF, Word y Excel. Las metricas finales se completan al ejecutar el pipeline con el dataset "
+            "publico en el entorno del equipo."
+        )
     add_para(doc, "Palabras clave: asesor financiero, redes neuronales, riesgo crediticio, FastAPI, Streamlit.")
 
     doc.add_heading("1. Introduccion", level=1)
@@ -374,19 +482,37 @@ def build_document() -> None:
     add_table(
         doc,
         ["Modelo", "Accuracy", "Precision", "Recall", "F1", "AUC-ROC", "Tiempo medio"],
-        [
-            ["MLP", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"],
-            ["LSTM", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"],
-            ["GRU", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"],
-            ["CNN-LSTM", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"],
-            ["LSTM-Attention", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente", "Pendiente"],
-        ],
+        comparison_rows(),
         [1700, 1250, 1250, 1250, 1050, 1300, 1560],
     )
-    add_para(
+    if final_metrics:
+        add_para(
+            doc,
+            "Las figuras requeridas se generaron en la carpeta `outputs/`: mapa de calor de correlaciones, "
+            "matriz de confusion y curva ROC. El mejor modelo se guardo como `models/best_model.keras` y "
+            "`models/best_model.h5` para ser consumido por FastAPI sin reentrenamiento."
+        )
+    else:
+        add_para(
+            doc,
+            "Cuando se ejecute `python -m ml.training_pipeline --folds 5 --epochs 20`, esta tabla se completa "
+            "a partir de `outputs/model_comparison.csv`. Las figuras requeridas se generan en `outputs/`."
+        )
+
+    add_caption(doc, "Tabla 5. Tuning de hiperparametros del mejor modelo.")
+    add_table(
         doc,
-        "Cuando se ejecute `python -m ml.training_pipeline --folds 5 --epochs 20`, esta tabla se completa "
-        "a partir de `outputs/model_comparison.csv`. Las figuras requeridas se generan en `outputs/`."
+        ["Modelo", "Learning rate", "Batch size", "AUC-ROC", "Tiempo"],
+        tuning_rows(),
+        [1900, 1900, 1700, 1700, 2160],
+    )
+
+    add_caption(doc, "Tabla 6. Pruebas estadisticas sobre AUC por fold.")
+    add_table(
+        doc,
+        ["Modelo", "Baseline", "p t-test", "p Wilcoxon", "Interpretacion"],
+        statistical_rows(),
+        [1700, 1700, 1700, 1700, 2560],
     )
 
     doc.add_heading("7. Arquitectura del sistema", level=1)
@@ -396,7 +522,7 @@ def build_document() -> None:
         "guardado y los artefactos de evaluacion. FastAPI carga el modelo y ofrece endpoints para prediccion. "
         "Streamlit valida credenciales, muestra dashboard, permite formular predicciones y descarga el articulo."
     )
-    add_caption(doc, "Tabla 5. Componentes del proyecto mejorado.")
+    add_caption(doc, "Tabla 7. Componentes del proyecto mejorado.")
     add_table(
         doc,
         ["Componente", "Tecnologia", "Responsabilidad"],
@@ -434,14 +560,24 @@ def build_document() -> None:
     )
 
     doc.add_heading("10. Conclusiones preliminares", level=1)
-    add_para(
-        doc,
-        "El proyecto queda reorientado hacia un sistema de inteligencia artificial verificable: posee dataset "
-        "publico, modelos definidos, validacion cruzada, tuning, pruebas estadisticas, consumo por API y "
-        "dashboard despues del login. El siguiente paso es ejecutar el pipeline de entrenamiento con el dataset "
-        "UCI, completar la tabla de resultados, interpretar las figuras generadas y seleccionar formalmente el "
-        "mejor modelo para produccion."
-    )
+    if final_metrics:
+        add_para(
+            doc,
+            "El proyecto queda reorientado hacia un sistema de inteligencia artificial verificable: posee dataset "
+            "publico, modelos definidos, validacion cruzada, tuning, pruebas estadisticas, consumo por API y "
+            "dashboard despues del login. La corrida registrada permitio seleccionar formalmente el modelo "
+            f"{best_model} como mejor alternativa por AUC-ROC. Para una entrega final mas robusta, se recomienda "
+            "repetir el entrenamiento con mayor numero de epocas y comparar la estabilidad de resultados."
+        )
+    else:
+        add_para(
+            doc,
+            "El proyecto queda reorientado hacia un sistema de inteligencia artificial verificable: posee dataset "
+            "publico, modelos definidos, validacion cruzada, tuning, pruebas estadisticas, consumo por API y "
+            "dashboard despues del login. El siguiente paso es ejecutar el pipeline de entrenamiento con el dataset "
+            "UCI, completar la tabla de resultados, interpretar las figuras generadas y seleccionar formalmente el "
+            "mejor modelo para produccion."
+        )
 
     doc.add_heading("Referencias", level=1)
     references = [

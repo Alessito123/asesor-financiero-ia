@@ -19,9 +19,23 @@ data/processed/*
 
 models/*
 !models/README.md
+!models/best_model.keras
+!models/best_model.h5
+!models/preprocessor.joblib
+!models/model_metadata.json
 
 outputs/*
 !outputs/.gitkeep
+!outputs/class_distribution.csv
+!outputs/class_distribution.png
+!outputs/confusion_matrix.png
+!outputs/correlation_heatmap.png
+!outputs/eda_summary.csv
+!outputs/fold_results.csv
+!outputs/hyperparameter_tuning.csv
+!outputs/model_comparison.csv
+!outputs/roc_curve.png
+!outputs/statistical_tests.csv
 
 *.log
 *.tmp

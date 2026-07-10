@@ -1,0 +1,59 @@
+{
+  "best_model": "LSTM",
+  "input_shape": "sequence",
+  "feature_columns": [
+    "LIMIT_BAL",
+    "SEX",
+    "EDUCATION",
+    "MARRIAGE",
+    "AGE",
+    "PAY_0",
+    "PAY_2",
+    "PAY_3",
+    "PAY_4",
+    "PAY_5",
+    "PAY_6",
+    "BILL_AMT1",
+    "BILL_AMT2",
+    "BILL_AMT3",
+    "BILL_AMT4",
+    "BILL_AMT5",
+    "BILL_AMT6",
+    "PAY_AMT1",
+    "PAY_AMT2",
+    "PAY_AMT3",
+    "PAY_AMT4",
+    "PAY_AMT5",
+    "PAY_AMT6"
+  ],
+  "final_metrics": {
+    "accuracy": 0.7991666666666667,
+    "precision": 0.6244897959183674,
+    "recall": 0.23059532780708364,
+    "f1": 0.3368189323059989,
+    "roc_auc": 0.7269777269120125
+  },
+  "best_cv_row": {
+    "model": "LSTM",
+    "input_shape": "sequence",
+    "accuracy_mean": 0.7981666666666667,
+    "precision_mean": 0.6267585336579138,
+    "recall_mean": 0.2245298072470742,
+    "f1_mean": 0.32835045295017784,
+    "roc_auc_mean": 0.7043249027523082,
+    "roc_auc_std": 0.011201998002095072,
+    "fit_seconds_mean": 3.816484759998275
+  },
+  "best_tuning_record": {
+    "model": "LSTM",
+    "fit_seconds": 3.696555000002263,
+    "learning_rate": 0.001,
+    "batch_size": 128,
+    "accuracy": 0.80125,
+    "precision": 0.6467391304347826,
+    "recall": 0.224105461393597,
+    "f1": 0.3328671328671329,
+    "roc_auc": 0.7176471299495485
+  },
+  "dataset": "UCI Default of Credit Card Clients"
+}

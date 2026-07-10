@@ -139,6 +139,20 @@ a {
   text-decoration: none;
 }
 
+.primary-link {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: var(--teal);
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
 .shell {
   width: min(1280px, calc(100% - 32px));
   margin: 0 auto;
@@ -207,7 +221,8 @@ h2 {
 }
 
 .form-panel,
-.insight-panel {
+.insight-panel,
+.reports-panel {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
@@ -519,6 +534,102 @@ a:focus-visible {
   color: var(--ink);
 }
 
+.reports-panel {
+  margin-top: 22px;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.report-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.report-preview {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbfcfd;
+}
+
+.report-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 14px;
+}
+
+.report-preview-head span,
+.report-row small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.report-preview-head span {
+  text-transform: uppercase;
+}
+
+.report-preview iframe {
+  display: block;
+  width: 100%;
+  height: min(620px, 70vh);
+  min-height: 420px;
+  border: 0;
+  background: #fff;
+}
+
+.report-list {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.report-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 76px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbfcfd;
+  color: var(--ink);
+  padding: 12px;
+  text-decoration: none;
+}
+
+.report-row:hover {
+  border-color: #9bd4ce;
+  background: #f0faf8;
+}
+
+.report-row strong,
+.report-row small {
+  display: block;
+}
+
+.report-row strong {
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.file-badge {
+  display: grid;
+  width: 54px;
+  min-height: 40px;
+  place-items: center;
+  border-radius: var(--radius);
+  background: #e8eef5;
+  color: #1f4c7a;
+  font-size: 12px;
+  font-weight: 950;
+}
+
 .risk-low {
   --risk-color: var(--green);
 }
@@ -533,7 +644,8 @@ a:focus-visible {
 
 @media (max-width: 1080px) {
   .overview,
-  .workspace {
+  .workspace,
+  .report-layout {
     grid-template-columns: 1fr;
   }
 
@@ -555,7 +667,8 @@ a:focus-visible {
   }
 
   .api-status,
-  .ghost-link {
+  .ghost-link,
+  .primary-link {
     justify-content: center;
     width: 100%;
   }
@@ -583,6 +696,10 @@ a:focus-visible {
   .risk-meter {
     justify-items: center;
     text-align: center;
+  }
+
+  .report-preview iframe {
+    min-height: 360px;
   }
 
   h1 {

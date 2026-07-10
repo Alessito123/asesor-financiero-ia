@@ -16,8 +16,8 @@ Proyecto Jira: KAN - Asesor Financiero IA
 
 | Componente | Plataforma | Estado | Evidencia |
 | --- | --- | --- | --- |
-| Backend FastAPI | Render | Desplegado | `/health` responde `status: ok` y `model_mode: baseline` |
-| Frontend web | Vercel | Desplegado | Sitio publico consume el backend de Render |
+| Backend FastAPI | Render | Desplegado | `/health` responde `status: ok`; el repo ya incluye modelo entrenado para cargar `model_mode: trained` en el siguiente rebuild |
+| Frontend web | Vercel | Desplegado | Sitio publico consume el backend de Render e incluye seccion de reportes |
 | Codigo fuente | GitHub | Publicado | Repositorio en `Alessito123/asesor-financiero-ia` |
 | Gestion/documentacion | Jira | Configurado | Proyecto `KAN` creado con backlog academico |
 | Integracion GitHub-Jira | GitHub for Atlassian | Conectado | GitHub Cloud muestra `Alessito123`, 1 repo, backfill `FINISHED` |
@@ -60,13 +60,14 @@ https://vercelfrontend-peach.vercel.app
 
 2. Verificar el estado de la API en pantalla. Debe indicar que la API esta disponible.
 3. Completar el formulario financiero y enviar la prediccion.
-4. Verificar directamente el backend:
+4. Bajar a la seccion de reportes para previsualizar el PDF y descargar Word, Excel y el articulo.
+5. Verificar directamente el backend:
 
 ```text
 https://asesor-financiero-api-wnyk.onrender.com/health
 ```
 
-5. Revisar la documentacion Swagger:
+6. Revisar la documentacion Swagger:
 
 ```text
 https://asesor-financiero-api-wnyk.onrender.com/docs
@@ -93,8 +94,15 @@ Archivos principales:
 | Python con FastAPI | Cumplido |
 | Python con Streamlit | Cumplido en `frontend/streamlit_app.py` |
 | Dataset publico | Cumplido: UCI Default of Credit Card Clients |
+| Tres modelos clasicos de redes neuronales | Cumplido: MLP, LSTM y GRU |
+| Dos modelos hibridos de redes neuronales | Cumplido: CNN-LSTM y LSTM-Attention |
+| EDA, limpieza y estadisticos descriptivos | Cumplido en `outputs/eda_summary.csv` y figuras |
+| Validacion cruzada 5 folds configurable | Cumplido en `outputs/fold_results.csv` |
+| Hiperparametros tuning | Cumplido en `outputs/hyperparameter_tuning.csv` |
+| Pruebas estadisticas robustas | Cumplido en `outputs/statistical_tests.csv` |
+| Mejor modelo guardado como .h5 | Cumplido: `models/best_model.h5` |
 | Articulo cientifico | Cumplido: archivo Word en `docs/` |
-| Reportes PDF, Word y Excel | Cumplido en `docs/` |
+| Reportes PDF, Word y Excel | Cumplido en `docs/` y visibles desde la app Vercel |
 
 ## Uso de Jira con commits
 

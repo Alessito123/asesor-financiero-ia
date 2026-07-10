@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import base64
 from pathlib import Path
 from typing import Dict
 
@@ -17,6 +18,38 @@ from ml.schema import DEFAULT_SAMPLE, FEATURE_COLUMNS
 ROOT = Path(__file__).resolve().parents[1]
 ARTICLE_PATH = ROOT / "docs" / "articulo_cientifico_asesor_financiero_ia.docx"
 METRICS_PATH = ROOT / "outputs" / "model_comparison.csv"
+REPORT_FILES = [
+    (
+        "Reporte de modelos PDF",
+        ROOT / "docs" / "reporte_modelos.pdf",
+        "application/pdf",
+        "Vista ejecutiva para previsualizar y entregar.",
+    ),
+    (
+        "Reporte de modelos Word",
+        ROOT / "docs" / "reporte_modelos.docx",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Documento editable con tablas comparativas.",
+    ),
+    (
+        "Tablas de modelos Excel",
+        ROOT / "docs" / "reporte_modelos.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Resultados, folds y pruebas estadisticas.",
+    ),
+    (
+        "Articulo cientifico Word",
+        ARTICLE_PATH,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Avance metodologico del articulo de investigacion.",
+    ),
+    (
+        "Evidencia de entrega Word",
+        ROOT / "docs" / "entrega_final_asesor_financiero_ia.docx",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Enlaces de GitHub, Render, Vercel y Jira.",
+    ),
+]
 
 
 def apply_theme() -> None:
@@ -183,6 +216,58 @@ def metrics_tab() -> None:
         st.warning("Aun no hay metricas reales. Ejecuta: python -m ml.training_pipeline --folds 5")
 
 
+def reports_tab() -> None:
+    st.subheader("Reportes descargables y vista previa")
+    pdf_path = ROOT / "docs" / "reporte_modelos.pdf"
+
+    if pdf_path.exists():
+        encoded_pdf = base64.b64encode(pdf_path.read_bytes()).decode("ascii")
+        st.markdown(
+            f"""
+            <iframe
+                src="data:application/pdf;base64,{encoded_pdf}"
+                width="100%"
+                height="620"
+                style="border:1px solid #dce3e8;border-radius:8px;background:#ffffff;"
+            ></iframe>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.warning("No se encontro el PDF. Ejecuta: python reports/export_reports.py")
+
+    cols = st.columns(2)
+    for index, (label, path, mime, description) in enumerate(REPORT_FILES):
+        with cols[index % 2]:
+            st.markdown(f"**{label}**")
+            st.caption(description)
+            if path.exists():
+                st.download_button(
+                    "Descargar",
+                    path.read_bytes(),
+                    file_name=path.name,
+                    mime=mime,
+                    use_container_width=True,
+                    key=f"download_{path.name}",
+                )
+            else:
+                st.warning(f"Pendiente: {path.name}")
+
+    figure_paths = [
+        ("Mapa de calor", ROOT / "outputs" / "correlation_heatmap.png"),
+        ("Matriz de confusion", ROOT / "outputs" / "confusion_matrix.png"),
+        ("Curva ROC", ROOT / "outputs" / "roc_curve.png"),
+    ]
+    existing_figures = [(title, path) for title, path in figure_paths if path.exists()]
+    if existing_figures:
+        st.divider()
+        st.subheader("Figuras generadas por el entrenamiento")
+        figure_cols = st.columns(len(existing_figures))
+        for index, (title, path) in enumerate(existing_figures):
+            with figure_cols[index]:
+                st.image(str(path), caption=title, use_container_width=True)
+
+
 def dashboard() -> None:
     st.set_page_config(page_title="Asesor Financiero IA", page_icon="IA", layout="wide")
     apply_theme()
@@ -209,7 +294,7 @@ def dashboard() -> None:
     col2.metric("Modelos requeridos", "5", "3 clasicos + 2 hibridos")
     col3.metric("Validacion", "5 folds", "configurable")
 
-    tab1, tab2, tab3, tab4 = st.tabs(["Prediccion", "Modelos", "Articulo", "Despliegue"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Prediccion", "Modelos", "Reportes", "Articulo", "Despliegue"])
 
     with tab1:
         prediction_form()
@@ -218,6 +303,9 @@ def dashboard() -> None:
         metrics_tab()
 
     with tab3:
+        reports_tab()
+
+    with tab4:
         st.subheader("Articulo cientifico")
         if ARTICLE_PATH.exists():
             st.success("El avance del articulo ya fue generado.")
@@ -231,7 +319,7 @@ def dashboard() -> None:
         else:
             st.warning("Ejecuta: python reports/build_article_docx.py")
 
-    with tab4:
+    with tab5:
         st.subheader("Checklist de entrega")
         st.checkbox("Backend FastAPI preparado para Render", value=True)
         st.checkbox("Dashboard Streamlit con login", value=True)

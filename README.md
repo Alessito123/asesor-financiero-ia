@@ -55,6 +55,8 @@ Salidas principales:
 - `outputs/confusion_matrix.png`
 - `outputs/roc_curve.png`
 - `outputs/correlation_heatmap.png`
+- `outputs/hyperparameter_tuning.csv`
+- `outputs/statistical_tests.csv`
 
 ## Ejecutar backend
 
@@ -89,6 +91,7 @@ Despliegue actual:
 - Backend Render: https://asesor-financiero-api-wnyk.onrender.com
 
 El backend ya se publico en Render conectando este repositorio y usando `render.yaml`.
+La app publica tambien incluye una seccion de reportes para previsualizar el PDF y descargar Word, Excel y el articulo cientifico.
 
 ## Artículo científico
 
@@ -106,7 +109,7 @@ python reports/build_article_docx.py
 
 ## Nota académica
 
-No se inventan métricas. Las tablas del artículo quedan preparadas para completarse con los resultados reales generados por `ml.training_pipeline`.
+No se inventan métricas. Las tablas del artículo y los reportes se alimentan de los archivos reales generados por `ml.training_pipeline`. Para una corrida academica definitiva se recomienda ejecutar con `--epochs 20`; la corrida actual deja artefactos funcionales para validar el flujo completo.
 
 ## Entrega final
 
