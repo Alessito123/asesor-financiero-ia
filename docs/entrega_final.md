@@ -16,7 +16,7 @@ Proyecto Jira: KAN - Asesor Financiero IA
 
 | Componente | Plataforma | Estado | Evidencia |
 | --- | --- | --- | --- |
-| Backend FastAPI | Render | Desplegado | `/health` responde `status: ok`; el repo ya incluye modelo entrenado para cargar `model_mode: trained` en el siguiente rebuild |
+| Backend FastAPI | Render | Desplegado | `/health` responde `status: ok` y `model_mode: trained` |
 | Frontend web | Vercel | Desplegado | Sitio publico consume el backend de Render e incluye seccion de reportes |
 | Codigo fuente | GitHub | Publicado | Repositorio en `Alessito123/asesor-financiero-ia` |
 | Gestion/documentacion | Jira | Configurado | Proyecto `KAN` creado con backlog academico |
