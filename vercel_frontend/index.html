@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Asesor Financiero IA</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Frontend Vercel</p>
+          <h1>Asesor Financiero Personal IA</h1>
+          <p>
+            Formulario ligero para consultar la API FastAPI desplegada en Render.
+            El dashboard academico completo esta en Streamlit.
+          </p>
+        </div>
+        <div class="status" id="status">API: sin consultar</div>
+      </section>
+
+      <section class="panel">
+        <form id="risk-form">
+          <div class="grid">
+            <label>Credito concedido <input name="LIMIT_BAL" type="number" value="200000" /></label>
+            <label>Edad <input name="AGE" type="number" value="34" /></label>
+            <label>Sexo <select name="SEX"><option value="1">Masculino</option><option value="2" selected>Femenino</option></select></label>
+            <label>Educacion <select name="EDUCATION"><option value="1">Posgrado</option><option value="2" selected>Universidad</option><option value="3">Secundaria</option><option value="4">Otros</option></select></label>
+            <label>Estado civil <select name="MARRIAGE"><option value="1" selected>Casado</option><option value="2">Soltero</option><option value="3">Otros</option></select></label>
+            <label>PAY_0 <input name="PAY_0" type="number" value="1" /></label>
+            <label>PAY_2 <input name="PAY_2" type="number" value="0" /></label>
+            <label>PAY_3 <input name="PAY_3" type="number" value="0" /></label>
+            <label>PAY_4 <input name="PAY_4" type="number" value="0" /></label>
+            <label>PAY_5 <input name="PAY_5" type="number" value="0" /></label>
+            <label>PAY_6 <input name="PAY_6" type="number" value="0" /></label>
+          </div>
+          <div class="grid compact" id="amount-fields"></div>
+          <button type="submit">Calcular riesgo</button>
+        </form>
+      </section>
+
+      <section class="result" id="result" hidden></section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
