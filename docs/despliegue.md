@@ -14,13 +14,13 @@ Start Command: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 
 Si vas a subir `models/best_model.keras` y consumir el modelo neuronal real, usa `pip install -r requirements.txt` para incluir TensorFlow.
 
-Backend temporal desplegado en Vercel para demo publica:
+Backend desplegado en Render:
 
 ```text
-https://deploybackend-mu.vercel.app
+https://asesor-financiero-api-wnyk.onrender.com
 ```
 
-Cuando tengas el repositorio en GitHub, Render puede crear el servicio desde `render.yaml`.
+Render creo el servicio desde `render.yaml`.
 
 5. Configurar variables de entorno si aplica:
 
@@ -33,8 +33,8 @@ MODEL_METADATA_PATH=models/model_metadata.json
 6. Probar:
 
 ```text
-https://tu-api.onrender.com/health
-https://tu-api.onrender.com/docs
+https://asesor-financiero-api-wnyk.onrender.com/health
+https://asesor-financiero-api-wnyk.onrender.com/docs
 ```
 
 ## Frontend Streamlit
@@ -57,7 +57,7 @@ https://vercelfrontend-peach.vercel.app
 El frontend actualmente consume:
 
 ```text
-https://deploybackend-mu.vercel.app
+https://asesor-financiero-api-wnyk.onrender.com
 ```
 
 En Vercel:

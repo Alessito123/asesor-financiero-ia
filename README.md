@@ -86,9 +86,9 @@ BACKEND_URL=https://tu-backend-render.onrender.com
 Despliegue actual:
 
 - Frontend Vercel: https://vercelfrontend-peach.vercel.app
-- API temporal Vercel: https://deploybackend-mu.vercel.app
+- Backend Render: https://asesor-financiero-api-wnyk.onrender.com
 
-Para cumplir estrictamente la indicacion del docente, el backend debe publicarse en Render conectando este repositorio y usando `render.yaml`.
+El backend ya se publico en Render conectando este repositorio y usando `render.yaml`.
 
 ## Artículo científico
 

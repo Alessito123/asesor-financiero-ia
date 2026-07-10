@@ -1,6 +1,6 @@
 const backendUrl =
   window.BACKEND_URL ||
-  "https://deploybackend-mu.vercel.app";
+  "https://asesor-financiero-api-wnyk.onrender.com";
 const amountFields = document.querySelector("#amount-fields");
 const result = document.querySelector("#result");
 const statusBox = document.querySelector("#status");
