@@ -24,6 +24,13 @@ const coverageValue = document.querySelector("#coverage-value");
 const delayValue = document.querySelector("#delay-value");
 const flowTotal = document.querySelector("#flow-total");
 const flowChart = document.querySelector("#flow-chart");
+const previewReportButton = document.querySelector("#preview-report-button");
+const reportPreview = document.querySelector("#program-report-preview");
+const reportFrame = document.querySelector("#program-report-frame");
+const reportStatus = document.querySelector("#report-status");
+const reportButtons = document.querySelectorAll("[data-report-format]");
+
+let reportPreviewUrl = null;
 
 const baseSample = {
   LIMIT_BAL: 200000,
@@ -190,6 +197,65 @@ function formatMoney(value) {
 
 function formatPercent(value) {
   return `${Math.round((Number(value) || 0) * 100)}%`;
+}
+
+function reportFilename(format) {
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
+  return `reporte_financiero_programa_${stamp}.${format}`;
+}
+
+function setReportStatus(message, isError = false) {
+  reportStatus.textContent = message;
+  reportStatus.classList.toggle("is-error", isError);
+}
+
+function setReportButtonsLoading(isLoading) {
+  previewReportButton.disabled = isLoading;
+  reportButtons.forEach((button) => {
+    button.disabled = isLoading;
+  });
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function fetchProgramReport(format, { preview = false } = {}) {
+  setReportButtonsLoading(true);
+  setReportStatus(preview ? "Generando vista previa del reporte..." : "Preparando descarga...");
+
+  try {
+    const response = await fetch(`${backendUrl}/reports/financial/${format}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(getPayload()),
+    });
+
+    if (!response.ok) throw new Error("report");
+    const blob = await response.blob();
+
+    if (preview) {
+      if (reportPreviewUrl) URL.revokeObjectURL(reportPreviewUrl);
+      reportPreviewUrl = URL.createObjectURL(blob);
+      reportFrame.src = reportPreviewUrl;
+      reportPreview.classList.add("has-document");
+      setReportStatus("Vista previa generada con los datos actuales.");
+    } else {
+      downloadBlob(blob, reportFilename(format));
+      setReportStatus("Reporte descargado con los datos actuales.");
+    }
+  } catch {
+    setReportStatus("No se pudo generar el reporte. Revisa la conexion con Render.", true);
+  } finally {
+    setReportButtonsLoading(false);
+  }
 }
 
 function createField(config) {
@@ -368,6 +434,7 @@ async function checkHealth() {
 async function submitPrediction(event) {
   event.preventDefault();
   updateSnapshot();
+  const payload = getPayload();
 
   submitButton.disabled = true;
   submitButton.textContent = "Calculando...";
@@ -377,12 +444,13 @@ async function submitPrediction(event) {
     const response = await fetch(`${backendUrl}/predict`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(getPayload()),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) throw new Error("predict");
     const data = await response.json();
     setRiskState(Number(data.probability), data.risk_label, data);
+    fetchProgramReport("pdf", { preview: true });
   } catch {
     riskMeter.classList.remove("risk-low", "risk-medium", "risk-high");
     gaugeValue.textContent = "--";
@@ -407,9 +475,17 @@ renderFields();
 setPayload(baseSample);
 checkHealth();
 
-form.addEventListener("input", updateSnapshot);
+form.addEventListener("input", () => {
+  updateSnapshot();
+  setReportStatus("Datos modificados. Genera nuevamente el reporte para actualizarlo.");
+});
 form.addEventListener("submit", submitPrediction);
 resetButton.addEventListener("click", () => activateScenario("balanced"));
+previewReportButton.addEventListener("click", () => fetchProgramReport("pdf", { preview: true }));
+
+reportButtons.forEach((button) => {
+  button.addEventListener("click", () => fetchProgramReport(button.dataset.reportFormat));
+});
 
 document.querySelectorAll(".scenario-button").forEach((button) => {
   button.addEventListener("click", () => activateScenario(button.dataset.scenario));

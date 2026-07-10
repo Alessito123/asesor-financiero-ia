@@ -91,7 +91,7 @@ Despliegue actual:
 - Backend Render: https://asesor-financiero-api-wnyk.onrender.com
 
 El backend ya se publico en Render conectando este repositorio y usando `render.yaml`.
-La app publica tambien incluye una seccion de reportes para previsualizar el PDF y descargar Word, Excel y el articulo cientifico.
+La app publica tambien incluye una seccion de reportes del programa: genera con FastAPI un PDF previsualizable y descargas Word/Excel usando los datos financieros actuales del formulario. Los documentos academicos quedan como enlaces secundarios.
 
 ## Artículo científico
 
