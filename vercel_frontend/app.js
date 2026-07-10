@@ -109,7 +109,8 @@ const fieldGroups = {
       type: "number",
       min: 1,
       step: 1000,
-      hint: "Linea aprobada",
+      hint: "Monto en soles (S/)",
+      money: true,
     },
     { name: "AGE", label: "Edad", type: "number", min: 18, max: 100, hint: "18 a 100" },
     {
@@ -165,6 +166,8 @@ const fieldGroups = {
     type: "number",
     min: 0,
     step: 500,
+    hint: "S/",
+    money: true,
   })),
   payments: [1, 2, 3, 4, 5, 6].map((month) => ({
     name: `PAY_AMT${month}`,
@@ -172,6 +175,8 @@ const fieldGroups = {
     type: "number",
     min: 0,
     step: 500,
+    hint: "S/",
+    money: true,
   })),
 };
 
@@ -190,6 +195,7 @@ function formatPercent(value) {
 function createField(config) {
   const field = document.createElement("div");
   field.className = "field";
+  if (config.money) field.classList.add("money-field");
 
   const label = document.createElement("label");
   label.setAttribute("for", config.name);

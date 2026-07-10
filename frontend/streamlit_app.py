@@ -137,7 +137,7 @@ def prediction_form() -> None:
         payload = DEFAULT_SAMPLE.copy()
 
         with col1:
-            payload["LIMIT_BAL"] = st.number_input("Credito concedido", min_value=1, value=200000, step=10000)
+            payload["LIMIT_BAL"] = st.number_input("Credito concedido (S/)", min_value=1, value=200000, step=10000)
             payload["AGE"] = st.number_input("Edad", min_value=18, max_value=100, value=34)
             payload["SEX"] = st.selectbox("Sexo", options=[1, 2], format_func=lambda x: "Masculino" if x == 1 else "Femenino")
             payload["EDUCATION"] = st.selectbox("Educacion", options=[1, 2, 3, 4], format_func=lambda x: {1: "Posgrado", 2: "Universidad", 3: "Secundaria", 4: "Otros"}[x])
@@ -149,13 +149,13 @@ def prediction_form() -> None:
 
         with col3:
             for key in ["BILL_AMT1", "BILL_AMT2", "BILL_AMT3", "PAY_AMT1", "PAY_AMT2", "PAY_AMT3"]:
-                payload[key] = st.number_input(key, min_value=0, value=int(payload[key]), step=1000)
+                payload[key] = st.number_input(f"{key} (S/)", min_value=0, value=int(payload[key]), step=1000)
 
         with st.expander("Meses adicionales"):
             cols = st.columns(3)
             for i, key in enumerate(["BILL_AMT4", "BILL_AMT5", "BILL_AMT6", "PAY_AMT4", "PAY_AMT5", "PAY_AMT6"]):
                 with cols[i % 3]:
-                    payload[key] = st.number_input(key, min_value=0, value=int(payload[key]), step=1000)
+                    payload[key] = st.number_input(f"{key} (S/)", min_value=0, value=int(payload[key]), step=1000)
 
         submitted = st.form_submit_button("Calcular riesgo", use_container_width=True)
 

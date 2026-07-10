@@ -265,8 +265,19 @@ h2 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin: 22px 0;
+  margin: 18px 0 22px;
   border-radius: var(--radius);
+}
+
+.currency-note {
+  margin: 14px 0 0;
+  border: 1px solid #c8e6e1;
+  border-radius: var(--radius);
+  background: #f0faf8;
+  color: #0f5f58;
+  padding: 11px 12px;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .scenario-button {
@@ -315,6 +326,25 @@ h2 {
   display: grid;
   min-width: 0;
   gap: 7px;
+}
+
+.money-field {
+  position: relative;
+}
+
+.money-field input {
+  padding-left: 38px;
+}
+
+.money-field::after {
+  position: absolute;
+  left: 11px;
+  top: 33px;
+  color: var(--teal);
+  content: "S/";
+  font-size: 13px;
+  font-weight: 900;
+  pointer-events: none;
 }
 
 .field label {
