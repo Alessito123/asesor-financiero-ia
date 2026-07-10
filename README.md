@@ -107,3 +107,19 @@ python reports/build_article_docx.py
 ## Nota académica
 
 No se inventan métricas. Las tablas del artículo quedan preparadas para completarse con los resultados reales generados por `ml.training_pipeline`.
+
+## Entrega final
+
+La evidencia consolidada de despliegue, enlaces publicos, Jira y GitHub esta documentada en:
+
+```text
+docs/entrega_final.md
+docs/entrega_final_asesor_financiero_ia.docx
+```
+
+Resumen de enlaces:
+
+- GitHub: https://github.com/Alessito123/asesor-financiero-ia
+- Frontend Vercel: https://vercelfrontend-peach.vercel.app
+- Backend Render: https://asesor-financiero-api-wnyk.onrender.com
+- Jira: https://asesor-financiero-ia.atlassian.net/jira/software/projects/KAN/list
