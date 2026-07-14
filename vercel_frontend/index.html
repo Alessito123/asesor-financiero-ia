@@ -88,6 +88,9 @@
             </div>
           </div>
           <div class="profile-list" id="profile-list" aria-live="polite"></div>
+          <button class="secondary-button restore-button" id="restore-last-button" type="button" data-i18n="restore_last" hidden>
+            Restaurar ultima evaluacion
+          </button>
           <p class="currency-note" data-i18n="currency_note">Todos los montos monetarios se ingresan en soles peruanos (S/).</p>
 
           <div class="scenario-tabs" aria-label="Escenarios rapidos">
@@ -338,7 +341,10 @@
             <p class="eyebrow" data-i18n="chat_eyebrow">Asistente</p>
             <h2 id="chat-title" data-i18n="chat_title">Chatbot del asesor financiero</h2>
           </div>
-          <span class="mode-pill" data-i18n="chat_mode">Soporte academico</span>
+          <div class="chat-heading-actions">
+            <span class="mode-pill" data-i18n="chat_mode">Soporte academico</span>
+            <button class="icon-button chat-close" id="chat-close" type="button" data-i18n="chat_close">Cerrar</button>
+          </div>
         </div>
         <div class="chat-box" id="chat-messages" aria-live="polite">
           <div class="chat-message bot" data-i18n="chat_welcome">Hola, puedo explicar el modelo LSTM, los 5 modelos entrenados, reportes y pruebas estadisticas.</div>
@@ -358,6 +364,11 @@
         <button class="primary-link" id="onboarding-start" type="button" data-i18n="onboarding_start">Comenzar</button>
       </div>
     </div>
+
+    <button class="chat-launcher" id="chat-launcher" type="button" aria-controls="chatbot" data-i18n="chat_launcher">
+      Asistente IA
+    </button>
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
 
     <script src="./app.js"></script>
   </body>

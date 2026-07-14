@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import os
+import time
+from collections import defaultdict, deque
 from datetime import datetime
 from io import BytesIO
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from docx import Document
 from docx.shared import Inches
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
+from openpyxl.chart import BarChart, Reference
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from pydantic import BaseModel, Field
 
 from ml.predictor import FinancialRiskPredictor
@@ -21,29 +25,29 @@ from ml.statistical_validation import statistical_validation_summary
 
 
 class PredictionRequest(BaseModel):
-    LIMIT_BAL: float = Field(..., ge=1, description="Monto de credito concedido")
+    LIMIT_BAL: float = Field(..., ge=1, le=10_000_000, description="Monto de credito concedido")
     SEX: int = Field(2, ge=1, le=2)
     EDUCATION: int = Field(2, ge=1, le=4)
     MARRIAGE: int = Field(1, ge=1, le=3)
     AGE: int = Field(..., ge=18, le=100)
-    PAY_0: int = 0
-    PAY_2: int = 0
-    PAY_3: int = 0
-    PAY_4: int = 0
-    PAY_5: int = 0
-    PAY_6: int = 0
-    BILL_AMT1: float = 0
-    BILL_AMT2: float = 0
-    BILL_AMT3: float = 0
-    BILL_AMT4: float = 0
-    BILL_AMT5: float = 0
-    BILL_AMT6: float = 0
-    PAY_AMT1: float = 0
-    PAY_AMT2: float = 0
-    PAY_AMT3: float = 0
-    PAY_AMT4: float = 0
-    PAY_AMT5: float = 0
-    PAY_AMT6: float = 0
+    PAY_0: int = Field(0, ge=-2, le=9)
+    PAY_2: int = Field(0, ge=-2, le=9)
+    PAY_3: int = Field(0, ge=-2, le=9)
+    PAY_4: int = Field(0, ge=-2, le=9)
+    PAY_5: int = Field(0, ge=-2, le=9)
+    PAY_6: int = Field(0, ge=-2, le=9)
+    BILL_AMT1: float = Field(0, ge=0, le=10_000_000)
+    BILL_AMT2: float = Field(0, ge=0, le=10_000_000)
+    BILL_AMT3: float = Field(0, ge=0, le=10_000_000)
+    BILL_AMT4: float = Field(0, ge=0, le=10_000_000)
+    BILL_AMT5: float = Field(0, ge=0, le=10_000_000)
+    BILL_AMT6: float = Field(0, ge=0, le=10_000_000)
+    PAY_AMT1: float = Field(0, ge=0, le=10_000_000)
+    PAY_AMT2: float = Field(0, ge=0, le=10_000_000)
+    PAY_AMT3: float = Field(0, ge=0, le=10_000_000)
+    PAY_AMT4: float = Field(0, ge=0, le=10_000_000)
+    PAY_AMT5: float = Field(0, ge=0, le=10_000_000)
+    PAY_AMT6: float = Field(0, ge=0, le=10_000_000)
 
 
 class PredictionResponse(BaseModel):
@@ -59,12 +63,15 @@ class PredictionResponse(BaseModel):
 class ChatbotRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=600)
     language: str = Field("es", pattern="^(es|en)$")
+    prediction_context: Optional[Dict[str, Any]] = None
 
 
 class ChatbotResponse(BaseModel):
     answer: str
     language: str
     topics: List[str]
+    sources: List[str] = Field(default_factory=list)
+    context_used: bool = False
 
 
 app = FastAPI(
@@ -80,6 +87,40 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "10"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+RATE_LIMITED_PATHS = {
+    "/predict",
+    "/chatbot",
+    "/reports/financial/pdf",
+    "/reports/financial/docx",
+    "/reports/financial/xlsx",
+}
+_request_log: Dict[str, deque[float]] = defaultdict(deque)
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    if request.method == "POST" and request.url.path in RATE_LIMITED_PATHS:
+        client_host = request.client.host if request.client else "unknown"
+        key = f"{client_host}:{request.url.path}"
+        now = time.monotonic()
+        bucket = _request_log[key]
+        while bucket and now - bucket[0] > RATE_LIMIT_WINDOW_SECONDS:
+            bucket.popleft()
+        if len(bucket) >= RATE_LIMIT_MAX_REQUESTS:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": "Limite de uso alcanzado. Espera un minuto antes de volver a intentar.",
+                    "limit": RATE_LIMIT_MAX_REQUESTS,
+                    "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
+                },
+            )
+        bucket.append(now)
+    return await call_next(request)
+
 
 predictor = FinancialRiskPredictor()
 
@@ -130,6 +171,69 @@ SEX_LABELS = {1: "Masculino", 2: "Femenino"}
 EDUCATION_LABELS = {1: "Posgrado", 2: "Universidad", 3: "Secundaria", 4: "Otros"}
 MARRIAGE_LABELS = {1: "Casado", 2: "Soltero", 3: "Otros"}
 
+ACADEMIC_KNOWLEDGE = [
+    {
+        "id": "dataset_uci_credit_card",
+        "keywords": ["dataset", "uci", "datos", "variables", "credit card", "taiwan"],
+        "es": (
+            "El sistema se basa en el dataset publico UCI Default of Credit Card Clients, "
+            "con variables de limite de credito, perfil del cliente, historial de mora, saldos facturados y pagos."
+        ),
+        "en": (
+            "The system is based on the public UCI Default of Credit Card Clients dataset, "
+            "with credit limit, client profile, delay history, billed balances and payment variables."
+        ),
+    },
+    {
+        "id": "model_catalog",
+        "keywords": ["modelo", "model", "lstm", "gru", "mlp", "cnn", "attention", "hibrido", "hybrid"],
+        "es": (
+            "La investigacion compara tres modelos neuronales clasicos (MLP, LSTM, GRU) y dos hibridos "
+            "(CNN-LSTM y LSTM-Attention). El modelo guardado se consume desde FastAPI para evitar reentrenar."
+        ),
+        "en": (
+            "The research compares three classic neural models (MLP, LSTM, GRU) and two hybrid models "
+            "(CNN-LSTM and LSTM-Attention). The saved model is consumed from FastAPI to avoid retraining."
+        ),
+    },
+    {
+        "id": "statistical_validation",
+        "keywords": ["estadistica", "statistical", "wilcoxon", "t-test", "cross", "fold", "validacion"],
+        "es": (
+            "La validacion incluye cross validation configurable de 5 folds, comparacion de metricas y pruebas "
+            "estadisticas pareadas como t-test y Wilcoxon para contrastar diferencias entre modelos."
+        ),
+        "en": (
+            "Validation includes configurable 5-fold cross validation, metric comparison and paired statistical "
+            "tests such as t-test and Wilcoxon to contrast model differences."
+        ),
+    },
+    {
+        "id": "reports_module",
+        "keywords": ["reporte", "report", "pdf", "word", "excel", "descargar", "download"],
+        "es": (
+            "El modulo de reportes genera PDF, Word y Excel del analisis financiero del programa, incluyendo "
+            "resultado, indicadores, recomendaciones y datos ingresados."
+        ),
+        "en": (
+            "The reports module generates PDF, Word and Excel files for the program's financial analysis, "
+            "including result, indicators, recommendations and entered data."
+        ),
+    },
+    {
+        "id": "operational_xai",
+        "keywords": ["explica", "explain", "xai", "shap", "porque", "why", "riesgo", "risk"],
+        "es": (
+            "La explicabilidad operativa resume factores como mora reciente, cobertura de pagos, uso del credito, "
+            "limite aprobado y edad. Es una aproximacion interpretable para acompanar la prediccion neuronal."
+        ),
+        "en": (
+            "Operational explainability summarizes factors such as recent delay, payment coverage, credit usage, "
+            "approved limit and age. It is an interpretable approximation that accompanies the neural prediction."
+        ),
+    },
+]
+
 
 def money(value: float) -> str:
     return f"S/ {float(value):,.0f}".replace(",", " ")
@@ -169,6 +273,91 @@ def financial_indicators(payload: Dict) -> Dict[str, float]:
     }
 
 
+def clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
+def operational_risk_drivers(payload: Dict) -> List[Dict[str, Any]]:
+    indicators = financial_indicators(payload)
+    limit_bal = float(payload.get("LIMIT_BAL", 0))
+    age = int(float(payload.get("AGE", 0)))
+    drivers: List[Dict[str, Any]] = []
+
+    if indicators["max_delay"] > 0:
+        drivers.append(
+            {
+                "factor": "Mora reciente",
+                "direction": "increase",
+                "impact": round(clamp(0.05 + indicators["max_delay"] * 0.055, 0.05, 0.32), 3),
+                "detail": f"{int(indicators['max_delay'])} meses de atraso maximo detectado.",
+            }
+        )
+    if indicators["payment_coverage"] < 0.08:
+        drivers.append(
+            {
+                "factor": "Cobertura de pagos",
+                "direction": "increase",
+                "impact": round(clamp(0.14 - indicators["payment_coverage"], 0.06, 0.18), 3),
+                "detail": f"Cobertura acumulada de {percent(indicators['payment_coverage'])}.",
+            }
+        )
+    elif indicators["payment_coverage"] > 0.18:
+        drivers.append(
+            {
+                "factor": "Cobertura de pagos",
+                "direction": "reduce",
+                "impact": round(clamp(indicators["payment_coverage"] * 0.34, 0.06, 0.18), 3),
+                "detail": f"Cobertura acumulada de {percent(indicators['payment_coverage'])}.",
+            }
+        )
+    if indicators["credit_usage"] > 0.65:
+        drivers.append(
+            {
+                "factor": "Uso de credito",
+                "direction": "increase",
+                "impact": round(clamp((indicators["credit_usage"] - 0.55) * 0.22, 0.05, 0.20), 3),
+                "detail": f"Uso promedio de {percent(indicators['credit_usage'])}.",
+            }
+        )
+    elif indicators["credit_usage"] < 0.25:
+        drivers.append(
+            {
+                "factor": "Uso de credito",
+                "direction": "reduce",
+                "impact": round(clamp((0.3 - indicators["credit_usage"]) * 0.28, 0.04, 0.12), 3),
+                "detail": f"Uso promedio de {percent(indicators['credit_usage'])}.",
+            }
+        )
+    if limit_bal >= 250000:
+        drivers.append(
+            {
+                "factor": "Capacidad aprobada",
+                "direction": "reduce",
+                "impact": 0.07,
+                "detail": f"Limite de credito de {money(limit_bal)}.",
+            }
+        )
+    elif 0 < limit_bal < 80000:
+        drivers.append(
+            {
+                "factor": "Capacidad aprobada",
+                "direction": "increase",
+                "impact": 0.06,
+                "detail": f"Limite de credito de {money(limit_bal)}.",
+            }
+        )
+    if 0 < age < 25:
+        drivers.append(
+            {"factor": "Madurez financiera", "direction": "increase", "impact": 0.04, "detail": f"Edad: {age} anos."}
+        )
+    elif age >= 45:
+        drivers.append(
+            {"factor": "Madurez financiera", "direction": "reduce", "impact": 0.04, "detail": f"Edad: {age} anos."}
+        )
+
+    return sorted(drivers, key=lambda item: item["impact"], reverse=True)[:5]
+
+
 def recommendations(result: Dict, indicators: Dict) -> List[str]:
     probability = float(result["probability"])
     notes = []
@@ -198,6 +387,7 @@ def report_context(request: PredictionRequest) -> Dict:
         "payload": payload,
         "result": result,
         "indicators": indicators,
+        "drivers": operational_risk_drivers(payload),
         "recommendations": recommendations(result, indicators),
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -207,11 +397,20 @@ def build_pdf_report(context: Dict) -> bytes:
     payload = context["payload"]
     result = context["result"]
     indicators = context["indicators"]
+    drivers = context["drivers"]
 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
+    pdf.set_fill_color(10, 13, 20)
+    pdf.rect(0, 0, 210, 30, "F")
+    pdf.set_text_color(255, 255, 255)
     pdf.set_font("helvetica", "B", 16)
+    pdf.set_xy(12, 10)
+    pdf.cell(0, 9, "Asesor Financiero IA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_text_color(16, 24, 40)
+    pdf.ln(12)
+    pdf.set_font("helvetica", "B", 15)
     pdf.cell(0, 9, "Reporte financiero del programa", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.set_font("helvetica", "", 10)
     pdf.cell(0, 7, f"Generado: {context['generated_at']}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -242,6 +441,23 @@ def build_pdf_report(context: Dict) -> bytes:
     pdf.ln(2)
 
     pdf.set_font("helvetica", "B", 13)
+    pdf.cell(0, 8, "Factores explicativos", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font("helvetica", "", 10)
+    if drivers:
+        for driver in drivers:
+            sign = "+" if driver["direction"] == "increase" else "-"
+            pdf.multi_cell(
+                0,
+                6,
+                f"- {driver['factor']}: {sign}{percent(driver['impact'])}. {driver['detail']}",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
+    else:
+        pdf.multi_cell(0, 6, "El perfil no muestra factores extremos de riesgo.", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.ln(2)
+
+    pdf.set_font("helvetica", "B", 13)
     pdf.cell(0, 8, "Recomendaciones", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.set_font("helvetica", "", 10)
     for item in context["recommendations"]:
@@ -262,6 +478,7 @@ def build_docx_report(context: Dict) -> bytes:
     payload = context["payload"]
     result = context["result"]
     indicators = context["indicators"]
+    drivers = context["drivers"]
 
     doc = Document()
     section = doc.sections[0]
@@ -303,6 +520,17 @@ def build_docx_report(context: Dict) -> bytes:
         cells[0].text = label
         cells[1].text = value
 
+    doc.add_heading("Factores explicativos", level=2)
+    if drivers:
+        for driver in drivers:
+            sign = "+" if driver["direction"] == "increase" else "-"
+            doc.add_paragraph(
+                f"{driver['factor']}: {sign}{percent(driver['impact'])}. {driver['detail']}",
+                style="List Bullet",
+            )
+    else:
+        doc.add_paragraph("El perfil no muestra factores extremos de riesgo.")
+
     doc.add_heading("Recomendaciones", level=2)
     for item in context["recommendations"]:
         doc.add_paragraph(item, style="List Bullet")
@@ -326,19 +554,35 @@ def build_xlsx_report(context: Dict) -> bytes:
     payload = context["payload"]
     result = context["result"]
     indicators = context["indicators"]
+    drivers = context["drivers"]
     wb = Workbook()
     ws = wb.active
-    ws.title = "Reporte"
+    ws.title = "Resumen"
 
+    title_fill = PatternFill("solid", fgColor="0A0D14")
     header_fill = PatternFill("solid", fgColor="E8EEF5")
+    good_fill = PatternFill("solid", fgColor="DDF7E8")
+    warning_fill = PatternFill("solid", fgColor="FFF2CC")
+    danger_fill = PatternFill("solid", fgColor="FAD6DB")
+    thin_border = Border(bottom=Side(style="thin", color="D9E2EA"))
     bold = Font(bold=True)
+    white_bold = Font(bold=True, color="FFFFFF")
+
+    def style_row(sheet, row_number: int, fill: PatternFill = header_fill) -> None:
+        for cell in sheet[row_number]:
+            cell.font = bold
+            cell.fill = fill
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical="center")
+
     ws.append(["Reporte financiero del programa", context["generated_at"]])
+    style_row(ws, 1, title_fill)
+    ws["A1"].font = white_bold
+    ws["B1"].font = white_bold
     ws.append(["Modelo", result["model_name"], "Modo", result["mode"]])
     ws.append([])
     ws.append(["Resultado", "Valor"])
-    for cell in ws[4]:
-        cell.font = bold
-        cell.fill = header_fill
+    style_row(ws, 4)
     for row in [
         ("Probabilidad de incumplimiento", percent(result["probability"])),
         ("Nivel de riesgo", result["risk_label"].upper()),
@@ -346,12 +590,14 @@ def build_xlsx_report(context: Dict) -> bytes:
         ("Decision", "incumplimiento probable" if result["prediction"] else "sin incumplimiento probable"),
     ]:
         ws.append(row)
+    risk_row = 6
+    ws[f"B{risk_row}"].fill = (
+        danger_fill if result["risk_label"] == "alto" else warning_fill if result["risk_label"] == "medio" else good_fill
+    )
 
     ws.append([])
     ws.append(["Indicador", "Valor"])
-    for cell in ws[10]:
-        cell.font = bold
-        cell.fill = header_fill
+    style_row(ws, 10)
     for row in [
         ("Saldos totales", money(indicators["total_bills"])),
         ("Pagos totales", money(indicators["total_payments"])),
@@ -362,25 +608,55 @@ def build_xlsx_report(context: Dict) -> bytes:
         ws.append(row)
 
     ws.append([])
+    ws.append(["Factores explicativos", "Impacto"])
+    style_row(ws, ws.max_row)
+    if drivers:
+        for driver in drivers:
+            sign = "+" if driver["direction"] == "increase" else "-"
+            ws.append([f"{driver['factor']} - {driver['detail']}", f"{sign}{percent(driver['impact'])}"])
+            ws.cell(ws.max_row, 2).fill = danger_fill if driver["direction"] == "increase" else good_fill
+    else:
+        ws.append(["Sin factores extremos detectados", "0%"])
+
+    ws.append([])
     ws.append(["Recomendaciones"])
-    ws[17][0].font = bold
-    ws[17][0].fill = header_fill
+    style_row(ws, ws.max_row)
     for item in context["recommendations"]:
         ws.append([item])
 
     data_ws = wb.create_sheet("Datos ingresados")
-    data_ws.append(["Variable", "Valor"])
-    for cell in data_ws[1]:
-        cell.font = bold
-        cell.fill = header_fill
+    data_ws.append(["Variable", "Valor mostrado", "Valor numerico"])
+    style_row(data_ws, 1)
     for key in FEATURE_COLUMNS:
-        data_ws.append([FIELD_LABELS.get(key, key), display_value(key, payload[key])])
+        data_ws.append([FIELD_LABELS.get(key, key), display_value(key, payload[key]), payload[key]])
+        current_row = data_ws.max_row
+        if key.startswith("PAY_AMT"):
+            data_ws.cell(current_row, 2).fill = good_fill if float(payload[key]) > 0 else warning_fill
+        elif key.startswith("PAY_"):
+            data_ws.cell(current_row, 2).fill = danger_fill if float(payload[key]) > 0 else good_fill
 
-    for sheet in [ws, data_ws]:
-        sheet.column_dimensions["A"].width = 34
-        sheet.column_dimensions["B"].width = 28
+    chart_ws = wb.create_sheet("Saldos vs Pagos")
+    chart_ws.append(["Mes", "Saldo", "Pago"])
+    style_row(chart_ws, 1)
+    for month in range(1, 7):
+        chart_ws.append([f"M{month}", float(payload[f"BILL_AMT{month}"]), float(payload[f"PAY_AMT{month}"])])
+    chart = BarChart()
+    chart.title = "Saldos facturados vs pagos"
+    chart.y_axis.title = "Soles"
+    chart.x_axis.title = "Mes"
+    chart.add_data(Reference(chart_ws, min_col=2, max_col=3, min_row=1, max_row=7), titles_from_data=True)
+    chart.set_categories(Reference(chart_ws, min_col=1, min_row=2, max_row=7))
+    chart_ws.add_chart(chart, "E2")
+
+    for sheet in [ws, data_ws, chart_ws]:
+        sheet.freeze_panes = "A2"
+        sheet.column_dimensions["A"].width = 38
+        sheet.column_dimensions["B"].width = 30
         sheet.column_dimensions["C"].width = 18
         sheet.column_dimensions["D"].width = 18
+        for row in sheet.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(vertical="top", wrap_text=True)
 
     buffer = BytesIO()
     wb.save(buffer)
@@ -396,12 +672,79 @@ def report_response(content: bytes, filename: str, media_type: str, inline: bool
     )
 
 
-def chatbot_answer(message: str, language: str) -> Dict:
+def retrieve_knowledge(message: str, language: str, limit: int = 3) -> List[Dict[str, str]]:
+    text = message.lower()
+    scored = []
+    for item in ACADEMIC_KNOWLEDGE:
+        score = sum(1 for keyword in item["keywords"] if keyword in text)
+        if score:
+            scored.append((score, item))
+    scored.sort(key=lambda row: row[0], reverse=True)
+    return [
+        {"id": item["id"], "text": item[language]}
+        for _, item in scored[:limit]
+    ]
+
+
+def summarize_prediction_context(prediction_context: Optional[Dict[str, Any]], language: str) -> str:
+    if not prediction_context:
+        return ""
+    probability = prediction_context.get("probability")
+    risk_label = prediction_context.get("risk_label")
+    model_name = prediction_context.get("model_name")
+    drivers = prediction_context.get("drivers") or []
+    if probability is None:
+        return ""
+
+    try:
+        probability_text = percent(float(probability))
+    except (TypeError, ValueError):
+        probability_text = str(probability)
+
+    driver_text = ""
+    if drivers:
+        driver_parts = []
+        for driver in drivers[:3]:
+            label = driver.get("factor") or driver.get("label") or "factor"
+            direction = driver.get("direction", "increase")
+            direction_text = "aumenta" if direction == "increase" else "reduce"
+            if language == "en":
+                direction_text = "increases" if direction == "increase" else "reduces"
+            impact = driver.get("impact")
+            impact_text = f" {percent(float(impact))}" if isinstance(impact, (int, float)) else ""
+            driver_parts.append(f"{label} ({direction_text}{impact_text})")
+        driver_text = "; ".join(driver_parts)
+
+    if language == "en":
+        base = f"Current evaluation: {probability_text} risk, label {risk_label}, model {model_name}."
+        return f"{base} Main factors: {driver_text}." if driver_text else base
+    base = f"Evaluacion actual: {probability_text} de riesgo, nivel {risk_label}, modelo {model_name}."
+    return f"{base} Factores principales: {driver_text}." if driver_text else base
+
+
+def chatbot_answer(message: str, language: str, prediction_context: Optional[Dict[str, Any]] = None) -> Dict:
     text = message.lower()
     stats = statistical_validation_summary()
     topics: List[str] = []
+    retrieved = retrieve_knowledge(message, language)
+    context_summary = summarize_prediction_context(prediction_context, language)
+    context_used = bool(context_summary)
 
-    if any(word in text for word in ["modelo", "model", "lstm", "red", "neural"]):
+    asks_current_risk = any(word in text for word in ["porque", "por que", "why", "18", "riesgo", "risk", "resultado"])
+
+    if context_summary and asks_current_risk:
+        topics.append("dynamic_context")
+        if language == "en":
+            answer = (
+                f"{context_summary} This means the assistant is reading the last simulated profile, not only a generic rule. "
+                "Operational XAI uses the payment delays, payment coverage, credit usage and approved limit to explain the neural result."
+            )
+        else:
+            answer = (
+                f"{context_summary} Esto significa que el asistente esta leyendo la ultima simulacion, no solo una regla generica. "
+                "La XAI operativa usa mora, cobertura de pagos, uso del credito y limite aprobado para explicar la salida neuronal."
+            )
+    elif any(word in text for word in ["modelo", "model", "lstm", "red", "neural"]):
         topics.append("models")
         if language == "en":
             answer = (
@@ -458,7 +801,20 @@ def chatbot_answer(message: str, language: str) -> Dict:
             "interpretacion del riesgo y despliegue en Render/Vercel."
         )
 
-    return {"answer": answer, "language": language, "topics": topics}
+    if retrieved:
+        sources_text = " ".join(item["text"] for item in retrieved)
+        if language == "en":
+            answer = f"{answer}\n\nProject context: {sources_text}"
+        else:
+            answer = f"{answer}\n\nContexto del proyecto: {sources_text}"
+
+    return {
+        "answer": answer,
+        "language": language,
+        "topics": topics,
+        "sources": [item["id"] for item in retrieved],
+        "context_used": context_used,
+    }
 
 
 @app.get("/")
@@ -492,7 +848,7 @@ def statistics_validation() -> Dict:
 
 @app.post("/chatbot", response_model=ChatbotResponse)
 def chatbot(request: ChatbotRequest) -> Dict:
-    return chatbot_answer(request.message, request.language)
+    return chatbot_answer(request.message, request.language, request.prediction_context)
 
 
 @app.post("/predict", response_model=PredictionResponse)

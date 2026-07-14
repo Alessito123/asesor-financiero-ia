@@ -38,11 +38,16 @@ const statsTableBody = document.querySelector("#stats-table-body");
 const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
 const chatMessages = document.querySelector("#chat-messages");
+const chatPanel = document.querySelector("#chatbot");
+const chatLauncher = document.querySelector("#chat-launcher");
+const chatClose = document.querySelector("#chat-close");
+const toastStack = document.querySelector("#toast-stack");
 const navLinks = document.querySelectorAll('.ghost-link[href^="#"]');
 const profileNameInput = document.querySelector("#profile-name-input");
 const saveProfileButton = document.querySelector("#save-profile-button");
 const profileList = document.querySelector("#profile-list");
 const profileCount = document.querySelector("#profile-count");
+const restoreLastButton = document.querySelector("#restore-last-button");
 const compareScenario = document.querySelector("#compare-scenario");
 const runCompareButton = document.querySelector("#run-compare-button");
 const compareGrid = document.querySelector("#compare-grid");
@@ -66,7 +71,7 @@ let isSubmitting = false;
 let currentWizardStep = 0;
 let statusState = { state: null, key: "api_connecting", params: {} };
 let reportState = { key: "report_ready", isError: false, params: {} };
-let predictionHistoryItems = readStoredArray("afi_prediction_history");
+let predictionHistoryItems = readStoredArray("afi_prediction_history").slice(0, 3);
 
 const translations = {
   es: {
@@ -163,11 +168,14 @@ const translations = {
     report_preview_ready: "Vista previa generada con los datos actuales.",
     report_downloaded: "Reporte descargado con los datos actuales.",
     report_error: "No se pudo generar el reporte. Revisa la conexion con Render.",
+    api_error_detail: "Render respondio con un error de validacion.",
     report_stale: "Datos modificados. Genera nuevamente el reporte para actualizarlo.",
     academic_docs: "Documentos academicos del proyecto",
     chat_eyebrow: "Asistente",
     chat_title: "Chatbot del asesor financiero",
     chat_mode: "Soporte academico",
+    chat_launcher: "Asistente IA",
+    chat_close: "Cerrar",
     chat_welcome: "Hola, puedo explicar el modelo LSTM, los 5 modelos entrenados, reportes y pruebas estadisticas.",
     chat_placeholder: "Pregunta sobre modelos, reportes o riesgo",
     chat_error: "No pude responder ahora. Revisa la conexion con Render.",
@@ -193,7 +201,10 @@ const translations = {
     clear_history: "Limpiar",
     no_history: "Aun no hay predicciones en esta sesion.",
     reload_profile: "Usar perfil",
+    restore_last: "Restaurar ultima evaluacion",
+    restored_last: "Ultima evaluacion restaurada",
     fullscreen_report: "Ampliar",
+    toast_dismiss: "Cerrar aviso",
     wizard_step_profile: "Perfil",
     wizard_step_history: "Historial",
     wizard_step_payments: "Pagos",
@@ -314,11 +325,14 @@ const translations = {
     report_preview_ready: "Preview generated with current data.",
     report_downloaded: "Report downloaded with current data.",
     report_error: "Could not generate the report. Check the Render connection.",
+    api_error_detail: "Render returned a validation error.",
     report_stale: "Data changed. Generate the report again to update it.",
     academic_docs: "Academic project documents",
     chat_eyebrow: "Assistant",
     chat_title: "Financial advisor chatbot",
     chat_mode: "Academic support",
+    chat_launcher: "AI Assistant",
+    chat_close: "Close",
     chat_welcome: "Hi, I can explain the LSTM model, the 5 trained models, reports and statistical tests.",
     chat_placeholder: "Ask about models, reports or risk",
     chat_error: "I could not answer now. Check the Render connection.",
@@ -344,7 +358,10 @@ const translations = {
     clear_history: "Clear",
     no_history: "No predictions in this session yet.",
     reload_profile: "Use profile",
+    restore_last: "Restore last evaluation",
+    restored_last: "Last evaluation restored",
     fullscreen_report: "Expand",
+    toast_dismiss: "Dismiss notice",
     wizard_step_profile: "Profile",
     wizard_step_history: "History",
     wizard_step_payments: "Payments",
@@ -510,6 +527,42 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function showToast(message, type = "info") {
+  if (!toastStack) return;
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `
+    <span>${escapeHtml(message)}</span>
+    <button type="button" aria-label="${t("toast_dismiss")}">x</button>
+  `;
+  toastStack.appendChild(toast);
+  const remove = () => {
+    toast.classList.add("is-leaving");
+    window.setTimeout(() => toast.remove(), 220);
+  };
+  toast.querySelector("button").addEventListener("click", remove);
+  window.setTimeout(remove, 5200);
+}
+
+function apiErrorMessage(data) {
+  if (!data) return t("api_error_detail");
+  if (typeof data.detail === "string") return data.detail;
+  if (Array.isArray(data.detail) && data.detail.length) {
+    const first = data.detail[0];
+    const field = Array.isArray(first.loc) ? first.loc.at(-1) : "";
+    return `${field ? `${field}: ` : ""}${first.msg || t("api_error_detail")}`;
+  }
+  return t("api_error_detail");
+}
+
+async function readErrorMessage(response) {
+  try {
+    return apiErrorMessage(await response.json());
+  } catch {
+    return t("api_error_detail");
+  }
 }
 
 const baseSample = {
@@ -796,7 +849,7 @@ async function fetchProgramReport(format, { preview = false } = {}) {
       body: JSON.stringify(getPayload()),
     });
 
-    if (!response.ok) throw new Error("report");
+    if (!response.ok) throw new Error(await readErrorMessage(response));
     const blob = await response.blob();
 
     if (preview) {
@@ -805,12 +858,15 @@ async function fetchProgramReport(format, { preview = false } = {}) {
       reportFrame.src = reportPreviewUrl;
       reportPreview.classList.add("has-document");
       setReportStatusKey("report_preview_ready");
+      showToast(t("report_preview_ready"), "success");
     } else {
       downloadBlob(blob, reportFilename(format));
       setReportStatusKey("report_downloaded");
+      showToast(t("report_downloaded"), "success");
     }
-  } catch {
+  } catch (error) {
     setReportStatusKey("report_error", true);
+    showToast(error.message || t("report_error"), "error");
   } finally {
     setReportButtonsLoading(false);
   }
@@ -897,6 +953,7 @@ function saveCurrentProfile() {
   writeStoredArray("afi_profiles", nextProfiles);
   profileNameInput.value = "";
   setReportStatus(`${t("profile_saved")}: ${name}`);
+  showToast(`${t("profile_saved")}: ${name}`, "success");
   renderProfiles();
 }
 
@@ -1013,6 +1070,7 @@ function goToWizardStep(step, options = {}) {
   const nextStep = Math.max(0, Math.min(2, Number(step)));
   if (options.validateCurrent && nextStep > currentWizardStep && !validateWizardStep(currentWizardStep)) {
     resultNotes.innerHTML = `<p>${t("validation_error")}</p>`;
+    showToast(t("validation_error"), "error");
     return;
   }
   currentWizardStep = nextStep;
@@ -1180,6 +1238,26 @@ function renderRiskDrivers(payload) {
     .join("");
 }
 
+function buildChatPredictionContext() {
+  if (!lastPrediction?.payload) return null;
+  const { probability, data, payload } = lastPrediction;
+  return {
+    probability,
+    risk_label: t(riskLabelKey(probability)),
+    model_name: data.model_name,
+    mode: data.mode,
+    threshold: data.threshold,
+    prediction: data.prediction,
+    indicators: calculateDerived(payload),
+    drivers: buildRiskDrivers(payload).map((driver) => ({
+      factor: t(driver.labelKey),
+      direction: driver.direction,
+      impact: driver.impact,
+      detail: t(driver.descriptionKey, driver.params),
+    })),
+  };
+}
+
 function drawFlowChart(payload) {
   const { bills, payments } = calculateDerived(payload);
   const maxValue = Math.max(...bills, ...payments, 1);
@@ -1251,7 +1329,7 @@ function renderRiskState() {
   riskCopy.textContent = t(riskCopyKey(probability));
   modelMode.textContent = `${data.model_name} | ${data.mode}`;
 
-  const notes = data.explanation
+  const notes = (data.explanation || [])
     .map((item) => (currentLanguage === "en" ? explanationTranslations[item] || item : item))
     .map((item) => `<li>${item}</li>`)
     .join("");
@@ -1276,16 +1354,20 @@ function addPredictionHistory(payload, data) {
       probability: Number(data.probability),
       modelName: data.model_name,
       mode: data.mode,
+      threshold: data.threshold,
+      prediction: data.prediction,
+      explanation: data.explanation || [],
       payload,
     },
     ...predictionHistoryItems,
-  ].slice(0, 8);
+  ].slice(0, 3);
   writeStoredArray("afi_prediction_history", predictionHistoryItems);
   renderPredictionHistory();
 }
 
 function renderPredictionHistory() {
   if (!predictionHistory) return;
+  if (restoreLastButton) restoreLastButton.hidden = predictionHistoryItems.length === 0;
   if (!predictionHistoryItems.length) {
     predictionHistory.innerHTML = `<p class="muted">${t("no_history")}</p>`;
     return;
@@ -1313,8 +1395,32 @@ function handleHistoryAction(event) {
   const item = button.closest("[data-history-index]");
   const historyItem = predictionHistoryItems[Number(item?.dataset.historyIndex)];
   if (!historyItem) return;
+  restoreHistoryItem(historyItem);
+}
+
+function restoreHistoryItem(historyItem) {
+  if (!historyItem) return;
   setPayload(historyItem.payload);
+  const probability = Number(historyItem.probability) || 0;
+  setRiskState(
+    probability,
+    riskLabelKey(probability),
+    {
+      probability,
+      model_name: historyItem.modelName || "LSTM",
+      mode: historyItem.mode || "trained",
+      threshold: historyItem.threshold ?? 0.5,
+      prediction: historyItem.prediction ?? Number(probability >= 0.5),
+      explanation: historyItem.explanation || [],
+    },
+    historyItem.payload,
+  );
   setReportStatusKey("report_stale");
+  showToast(t("restored_last"), "success");
+}
+
+function restoreLastEvaluation() {
+  restoreHistoryItem(predictionHistoryItems[0]);
 }
 
 function clearPredictionHistory() {
@@ -1344,6 +1450,7 @@ async function submitPrediction(event) {
   updateSnapshot();
   if (!validateForm()) {
     resultNotes.innerHTML = `<p>${t("validation_error")}</p>`;
+    showToast(t("validation_error"), "error");
     return;
   }
   const payload = getPayload();
@@ -1360,20 +1467,21 @@ async function submitPrediction(event) {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) throw new Error("predict");
+    if (!response.ok) throw new Error(await readErrorMessage(response));
     const data = await response.json();
     setRiskState(Number(data.probability), data.risk_label, data, payload);
     addPredictionHistory(payload, data);
     fetchProgramReport("pdf", { preview: true });
-  } catch {
+  } catch (error) {
     lastPrediction = null;
     riskMeter.classList.remove("risk-low", "risk-medium", "risk-high");
     gaugeValue.textContent = "--";
     riskLabel.textContent = t("no_connection");
-    riskCopy.textContent = t("render_connection_error");
+    riskCopy.textContent = error.message || t("render_connection_error");
     modelMode.textContent = "Error";
-    resultNotes.innerHTML = `<p>${t("check_backend")}</p>`;
+    resultNotes.innerHTML = `<p>${error.message || t("check_backend")}</p>`;
     renderDriverHint();
+    showToast(error.message || t("check_backend"), "error");
   } finally {
     isSubmitting = false;
     submitButton.disabled = false;
@@ -1546,6 +1654,18 @@ function addChatMessage(message, type) {
   return bubble;
 }
 
+async function streamChatMessage(element, text) {
+  element.textContent = "";
+  const chunks = String(text).split(/(\s+)/);
+  for (const chunk of chunks) {
+    element.textContent += chunk;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (chunk.trim()) {
+      await new Promise((resolve) => window.setTimeout(resolve, 18));
+    }
+  }
+}
+
 async function submitChat(event) {
   event.preventDefault();
   const message = chatInput.value.trim();
@@ -1558,14 +1678,30 @@ async function submitChat(event) {
     const response = await fetch(`${backendUrl}/chatbot`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, language: currentLanguage }),
+      body: JSON.stringify({
+        message,
+        language: currentLanguage,
+        prediction_context: buildChatPredictionContext(),
+      }),
     });
-    if (!response.ok) throw new Error("chatbot");
+    if (!response.ok) throw new Error(await readErrorMessage(response));
     const data = await response.json();
-    pending.textContent = data.answer;
-  } catch {
-    pending.textContent = t("chat_error");
+    await streamChatMessage(pending, data.answer);
+  } catch (error) {
+    pending.textContent = error.message || t("chat_error");
+    showToast(error.message || t("chat_error"), "error");
   }
+}
+
+function openChatDrawer() {
+  chatPanel.classList.add("is-open");
+  chatLauncher.setAttribute("aria-expanded", "true");
+  window.setTimeout(() => chatInput.focus(), 80);
+}
+
+function closeChatDrawer() {
+  chatPanel.classList.remove("is-open");
+  chatLauncher.setAttribute("aria-expanded", "false");
 }
 
 function setupSmoothNavigation() {
@@ -1574,6 +1710,10 @@ function setupSmoothNavigation() {
       const target = document.querySelector(link.getAttribute("href"));
       if (!target) return;
       event.preventDefault();
+      if (link.getAttribute("href") === "#chatbot") {
+        openChatDrawer();
+        return;
+      }
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
@@ -1620,6 +1760,9 @@ function openReportFullscreen() {
   }
 }
 
+chatPanel.classList.add("is-drawer");
+chatLauncher.setAttribute("aria-expanded", "false");
+
 renderFields();
 setPayload(baseSample);
 applyLanguage();
@@ -1640,6 +1783,7 @@ resetButton.addEventListener("click", () => activateScenario("balanced"));
 previewReportButton.addEventListener("click", () => fetchProgramReport("pdf", { preview: true }));
 saveProfileButton.addEventListener("click", saveCurrentProfile);
 profileList.addEventListener("click", handleProfileAction);
+restoreLastButton.addEventListener("click", restoreLastEvaluation);
 wizardPrev.addEventListener("click", () => goToWizardStep(currentWizardStep - 1));
 wizardNext.addEventListener("click", () => goToWizardStep(currentWizardStep + 1, { validateCurrent: true }));
 runCompareButton.addEventListener("click", runScenarioComparison);
@@ -1647,6 +1791,8 @@ predictionHistory.addEventListener("click", handleHistoryAction);
 clearHistoryButton.addEventListener("click", clearPredictionHistory);
 fullscreenReportButton.addEventListener("click", openReportFullscreen);
 onboardingStart.addEventListener("click", closeOnboarding);
+chatLauncher.addEventListener("click", openChatDrawer);
+chatClose.addEventListener("click", closeChatDrawer);
 languageToggle.addEventListener("click", () => {
   currentLanguage = currentLanguage === "es" ? "en" : "es";
   localStorage.setItem("afi_language", currentLanguage);
