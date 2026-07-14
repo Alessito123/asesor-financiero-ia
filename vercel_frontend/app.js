@@ -150,7 +150,7 @@ const translations = {
     table_validation: "Validacion",
     stats_loading: "Cargando pruebas estadisticas...",
     stats_error: "No se pudo cargar la validacion estadistica.",
-    selected_model: "Modelo seleccionado como mejor resultado.",
+    selected_model: "Modelo seleccionado para esta evaluacion.",
     no_interpretation: "Sin comparacion estadistica disponible.",
     model_type_classic: "Clasico",
     model_type_hybrid: "Hibrido",
@@ -313,7 +313,7 @@ const translations = {
     table_validation: "Validation",
     stats_loading: "Loading statistical tests...",
     stats_error: "Could not load statistical validation.",
-    selected_model: "Selected as the best model.",
+    selected_model: "Selected for this evaluation.",
     no_interpretation: "No statistical comparison available.",
     model_type_classic: "Classic",
     model_type_hybrid: "Hybrid",
@@ -826,6 +826,7 @@ function selectModel(modelName, { silent = false } = {}) {
   if (modelSelector) modelSelector.value = selectedModel;
   renderModelSelectorNote();
   setReportStatusKey("report_stale");
+  if (latestStats) renderStatistics();
   if (!silent) showToast(`${t("model_changed")}: ${displayModelName(selectedModel)}`, "success");
 }
 
@@ -1677,12 +1678,14 @@ function renderStatistics() {
   const testsByModel = new Map(tests.map((row) => [row.model, row]));
   productionModel.textContent = latestStats.production_model || "LSTM";
   renderModelSelector();
+  const activeModel = selectedModelName();
 
   modelGrid.innerHTML = (latestStats.model_catalog || [])
     .map((model) => {
       const metrics = comparisonByModel.get(model.name);
       const description = currentLanguage === "en" ? model.description_en : model.description;
-      const selectedClass = model.name === latestStats.production_model ? " is-selected" : "";
+      const isSelected = model.name === activeModel;
+      const selectedClass = isSelected ? " is-selected" : "";
       const availability = modelAvailability(model.name);
       return `
         <article class="model-card${selectedClass}" data-model-card="${model.name}">
@@ -1695,7 +1698,7 @@ function renderStatistics() {
             <div><dt>${t("auc_label")}</dt><dd>${formatDecimal(metrics?.roc_auc_mean, 3)}</dd></div>
             <div><dt>${t("f1_label")}</dt><dd>${formatDecimal(metrics?.f1_mean, 3)}</dd></div>
           </dl>
-          <button class="secondary-button small" type="button" data-model-select="${model.name}">
+          <button class="secondary-button small" type="button" data-model-select="${model.name}" aria-pressed="${isSelected ? "true" : "false"}">
             ${t("use_model")} ${availability.artifact_exists ? "" : "(proxy)"}
           </button>
         </article>
@@ -1705,7 +1708,7 @@ function renderStatistics() {
 
   statsTableBody.innerHTML = comparison
     .map((row) => {
-      const isSelected = row.model === latestStats.production_model;
+      const isSelected = row.model === activeModel;
       return `
         <tr>
           <td>${row.model.replaceAll("_", "-")}${isSelected ? " *" : ""}</td>
