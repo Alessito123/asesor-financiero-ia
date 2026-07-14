@@ -38,6 +38,19 @@ const statsTableBody = document.querySelector("#stats-table-body");
 const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
 const chatMessages = document.querySelector("#chat-messages");
+const navLinks = document.querySelectorAll('.ghost-link[href^="#"]');
+const profileNameInput = document.querySelector("#profile-name-input");
+const saveProfileButton = document.querySelector("#save-profile-button");
+const profileList = document.querySelector("#profile-list");
+const profileCount = document.querySelector("#profile-count");
+const compareScenario = document.querySelector("#compare-scenario");
+const runCompareButton = document.querySelector("#run-compare-button");
+const compareGrid = document.querySelector("#compare-grid");
+const predictionHistory = document.querySelector("#prediction-history");
+const clearHistoryButton = document.querySelector("#clear-history-button");
+const fullscreenReportButton = document.querySelector("#fullscreen-report-button");
+const onboarding = document.querySelector("#onboarding");
+const onboardingStart = document.querySelector("#onboarding-start");
 
 let currentLanguage = localStorage.getItem("afi_language") || "es";
 let currentTheme = localStorage.getItem("afi_theme") || "light";
@@ -47,6 +60,7 @@ let lastPrediction = null;
 let isSubmitting = false;
 let statusState = { state: null, key: "api_connecting", params: {} };
 let reportState = { key: "report_ready", isError: false, params: {} };
+let predictionHistoryItems = readStoredArray("afi_prediction_history");
 
 const translations = {
   es: {
@@ -153,6 +167,31 @@ const translations = {
     chat_error: "No pude responder ahora. Revisa la conexion con Render.",
     chat_typing: "Consultando al asistente...",
     send: "Enviar",
+    saved_profiles: "Perfiles guardados",
+    save_profile: "Guardar perfil",
+    profile_name: "Nombre del perfil",
+    profile_saved: "Perfil guardado",
+    load_profile: "Cargar",
+    delete_profile: "Eliminar",
+    no_profiles: "Aun no hay perfiles guardados.",
+    profile_limit: "Se guardan hasta 5 perfiles recientes.",
+    validation_error: "Revisa los campos marcados antes de calcular.",
+    compare_title: "Comparador de escenarios",
+    compare_button: "Comparar",
+    compare_hint: "Calcula el riesgo y compara el perfil actual contra un escenario alternativo.",
+    current_profile: "Perfil actual",
+    compared_profile: "Escenario comparado",
+    compare_loading: "Calculando comparacion...",
+    compare_error: "No se pudo comparar escenarios.",
+    history_title: "Historial de la sesion",
+    clear_history: "Limpiar",
+    no_history: "Aun no hay predicciones en esta sesion.",
+    reload_profile: "Usar perfil",
+    fullscreen_report: "Ampliar",
+    onboarding_eyebrow: "Inicio rapido",
+    onboarding_title: "Evalua riesgo financiero con IA en minutos",
+    onboarding_copy: "Ingresa o carga un perfil, calcula el riesgo, compara escenarios y descarga reportes del programa en PDF, Word o Excel.",
+    onboarding_start: "Comenzar",
   },
   en: {
     brand_subtitle: "Personal credit risk",
@@ -258,6 +297,31 @@ const translations = {
     chat_error: "I could not answer now. Check the Render connection.",
     chat_typing: "Asking the assistant...",
     send: "Send",
+    saved_profiles: "Saved profiles",
+    save_profile: "Save profile",
+    profile_name: "Profile name",
+    profile_saved: "Profile saved",
+    load_profile: "Load",
+    delete_profile: "Delete",
+    no_profiles: "No saved profiles yet.",
+    profile_limit: "Up to 5 recent profiles are saved.",
+    validation_error: "Check the marked fields before calculating.",
+    compare_title: "Scenario comparison",
+    compare_button: "Compare",
+    compare_hint: "Calculate risk and compare the current profile against an alternative scenario.",
+    current_profile: "Current profile",
+    compared_profile: "Compared scenario",
+    compare_loading: "Calculating comparison...",
+    compare_error: "Could not compare scenarios.",
+    history_title: "Session history",
+    clear_history: "Clear",
+    no_history: "No predictions in this session yet.",
+    reload_profile: "Use profile",
+    fullscreen_report: "Expand",
+    onboarding_eyebrow: "Quick start",
+    onboarding_title: "Evaluate financial risk with AI in minutes",
+    onboarding_copy: "Enter or load a profile, calculate risk, compare scenarios and download program reports as PDF, Word or Excel.",
+    onboarding_start: "Start",
   },
 };
 
@@ -377,6 +441,28 @@ const explanationTranslations = {
   "La utilizacion promedio del credito es elevada.": "Average credit utilization is high.",
   "El perfil se ubica en zona de menor riesgo relativo.": "The profile is in a lower relative risk zone.",
 };
+
+function readStoredArray(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredArray(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 const baseSample = {
   LIMIT_BAL: 200000,
@@ -598,6 +684,9 @@ function applyLanguage() {
   updateSnapshot();
   renderRiskState();
   renderStatistics();
+  renderProfiles();
+  renderPredictionHistory();
+  renderCompareHint();
   if (!lastPrediction) {
     modelMode.textContent = t("no_calculation");
     riskLabel.textContent = t("waiting_data");
@@ -691,6 +780,7 @@ function createField(config) {
     config.type === "select" ? document.createElement("select") : document.createElement("input");
   control.id = config.name;
   control.name = config.name;
+  control.dataset.fieldName = config.name;
 
   if (config.type === "select") {
     for (const [value, text] of config.options) {
@@ -707,6 +797,9 @@ function createField(config) {
     if (config.step !== undefined) control.step = config.step;
     control.inputMode = "decimal";
   }
+
+  control.addEventListener("input", () => validateField(control));
+  control.addEventListener("blur", () => validateField(control));
 
   field.append(label, control);
 
@@ -733,6 +826,78 @@ function setPayload(payload) {
     if (input) input.value = value;
   }
   updateSnapshot();
+  Array.from(form.querySelectorAll("input, select")).forEach(validateField);
+}
+
+function getSavedProfiles() {
+  return readStoredArray("afi_profiles");
+}
+
+function saveCurrentProfile() {
+  const name = (profileNameInput.value || "").trim() || `${t("current_profile")} ${new Date().toLocaleTimeString()}`;
+  const existing = getSavedProfiles().filter((profile) => profile.name !== name);
+  const nextProfiles = [
+    {
+      name,
+      createdAt: new Date().toISOString(),
+      payload: getPayload(),
+    },
+    ...existing,
+  ].slice(0, 5);
+  writeStoredArray("afi_profiles", nextProfiles);
+  profileNameInput.value = "";
+  setReportStatus(`${t("profile_saved")}: ${name}`);
+  renderProfiles();
+}
+
+function renderProfiles() {
+  if (!profileList || !profileCount) return;
+  const profiles = getSavedProfiles();
+  profileCount.textContent = profiles.length;
+
+  if (!profiles.length) {
+    profileList.innerHTML = `<p class="muted">${t("no_profiles")} ${t("profile_limit")}</p>`;
+    return;
+  }
+
+  profileList.innerHTML = profiles
+    .map((profile, index) => {
+      const safeName = escapeHtml(profile.name);
+      return `
+        <div class="profile-item" data-profile-index="${index}">
+          <div>
+            <span>${new Date(profile.createdAt).toLocaleDateString()}</span>
+            <strong>${safeName}</strong>
+          </div>
+          <div class="profile-item-actions">
+            <button class="secondary-button small" type="button" data-profile-action="load">${t("load_profile")}</button>
+            <button class="secondary-button small" type="button" data-profile-action="delete">${t("delete_profile")}</button>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function handleProfileAction(event) {
+  const button = event.target.closest("[data-profile-action]");
+  if (!button) return;
+  const item = button.closest("[data-profile-index]");
+  const index = Number(item?.dataset.profileIndex);
+  const profiles = getSavedProfiles();
+  const profile = profiles[index];
+  if (!profile) return;
+
+  if (button.dataset.profileAction === "load") {
+    setPayload(profile.payload);
+    setReportStatusKey("report_stale");
+  } else {
+    writeStoredArray(
+      "afi_profiles",
+      profiles.filter((_, candidateIndex) => candidateIndex !== index),
+    );
+    renderProfiles();
+  }
 }
 
 function getPayload() {
@@ -740,6 +905,32 @@ function getPayload() {
   const payload = {};
   for (const [key, value] of formData.entries()) payload[key] = Number(value);
   return payload;
+}
+
+function validateField(control) {
+  if (!control || control.disabled) return true;
+  let isValid = true;
+  const value = control.value;
+
+  if (control.tagName === "INPUT" && control.type === "number") {
+    const numeric = Number(value);
+    const min = control.min === "" ? null : Number(control.min);
+    const max = control.max === "" ? null : Number(control.max);
+    isValid = value !== "" && Number.isFinite(numeric);
+    if (isValid && min !== null) isValid = numeric >= min;
+    if (isValid && max !== null) isValid = numeric <= max;
+  }
+
+  control.classList.toggle("is-error", !isValid);
+  control.classList.toggle("is-valid", isValid && value !== "");
+  control.setAttribute("aria-invalid", String(!isValid));
+  return isValid;
+}
+
+function validateForm() {
+  const controls = Array.from(form.querySelectorAll("input, select"));
+  const results = controls.map(validateField);
+  return results.every(Boolean);
 }
 
 function getSeries(payload, prefix) {
@@ -855,6 +1046,60 @@ function setRiskState(probability, label, data) {
   renderRiskState();
 }
 
+function addPredictionHistory(payload, data) {
+  predictionHistoryItems = [
+    {
+      createdAt: new Date().toISOString(),
+      probability: Number(data.probability),
+      modelName: data.model_name,
+      mode: data.mode,
+      payload,
+    },
+    ...predictionHistoryItems,
+  ].slice(0, 8);
+  writeStoredArray("afi_prediction_history", predictionHistoryItems);
+  renderPredictionHistory();
+}
+
+function renderPredictionHistory() {
+  if (!predictionHistory) return;
+  if (!predictionHistoryItems.length) {
+    predictionHistory.innerHTML = `<p class="muted">${t("no_history")}</p>`;
+    return;
+  }
+
+  predictionHistory.innerHTML = predictionHistoryItems
+    .map((item, index) => {
+      const probability = Number(item.probability) || 0;
+      return `
+        <div class="history-item" data-history-index="${index}">
+          <div>
+            <span>${new Date(item.createdAt).toLocaleTimeString()}</span>
+            <strong>${formatPercent(probability)} - ${t(riskLabelKey(probability))}</strong>
+          </div>
+          <button class="secondary-button small" type="button" data-history-action="load">${t("reload_profile")}</button>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function handleHistoryAction(event) {
+  const button = event.target.closest("[data-history-action]");
+  if (!button) return;
+  const item = button.closest("[data-history-index]");
+  const historyItem = predictionHistoryItems[Number(item?.dataset.historyIndex)];
+  if (!historyItem) return;
+  setPayload(historyItem.payload);
+  setReportStatusKey("report_stale");
+}
+
+function clearPredictionHistory() {
+  predictionHistoryItems = [];
+  writeStoredArray("afi_prediction_history", predictionHistoryItems);
+  renderPredictionHistory();
+}
+
 async function checkHealth() {
   try {
     const response = await fetch(`${backendUrl}/health`);
@@ -869,6 +1114,10 @@ async function checkHealth() {
 async function submitPrediction(event) {
   event.preventDefault();
   updateSnapshot();
+  if (!validateForm()) {
+    resultNotes.innerHTML = `<p>${t("validation_error")}</p>`;
+    return;
+  }
   const payload = getPayload();
 
   isSubmitting = true;
@@ -886,6 +1135,7 @@ async function submitPrediction(event) {
     if (!response.ok) throw new Error("predict");
     const data = await response.json();
     setRiskState(Number(data.probability), data.risk_label, data);
+    addPredictionHistory(payload, data);
     fetchProgramReport("pdf", { preview: true });
   } catch {
     lastPrediction = null;
@@ -907,6 +1157,66 @@ function activateScenario(name) {
     button.classList.toggle("is-active", button.dataset.scenario === name);
   });
   setPayload(scenarios[name]);
+}
+
+function renderCompareHint() {
+  if (!compareGrid || compareGrid.dataset.hasResult === "true") return;
+  compareGrid.innerHTML = `<div class="compare-empty">${t("compare_hint")}</div>`;
+}
+
+async function predictPayload(payload) {
+  const response = await fetch(`${backendUrl}/predict`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error("predict");
+  return response.json();
+}
+
+function compareCard(title, result, payload) {
+  const probability = Number(result.probability) || 0;
+  const derived = calculateDerived(payload);
+  return `
+    <article class="compare-card ${probability >= 0.7 ? "risk-high" : probability >= 0.4 ? "risk-medium" : "risk-low"}">
+      <span>${title}</span>
+      <strong>${formatPercent(probability)}</strong>
+      <p>${t(riskLabelKey(probability))} | ${t("coverage")}: ${formatPercent(derived.coverage)} | ${t("max_delay")}: ${
+        derived.maxDelay > 0 ? `${derived.maxDelay}` : t("no_delay")
+      }</p>
+    </article>
+  `;
+}
+
+async function runScenarioComparison() {
+  if (!validateForm()) {
+    compareGrid.dataset.hasResult = "true";
+    compareGrid.innerHTML = `<div class="compare-empty">${t("validation_error")}</div>`;
+    return;
+  }
+
+  compareGrid.dataset.hasResult = "true";
+  compareGrid.innerHTML = `
+    <div class="skeleton-card"></div>
+    <div class="skeleton-card"></div>
+  `;
+  runCompareButton.disabled = true;
+
+  try {
+    const currentPayload = getPayload();
+    const selectedScenario = compareScenario.value;
+    const alternativePayload = scenarios[selectedScenario] || scenarios.healthy;
+    const currentResult = await predictPayload(currentPayload);
+    const alternativeResult = await predictPayload(alternativePayload);
+    compareGrid.innerHTML = [
+      compareCard(t("current_profile"), currentResult, currentPayload),
+      compareCard(t("compared_profile"), alternativeResult, alternativePayload),
+    ].join("");
+  } catch {
+    compareGrid.innerHTML = `<div class="compare-empty">${t("compare_error")}</div>`;
+  } finally {
+    runCompareButton.disabled = false;
+  }
 }
 
 function modelTypeLabel(model) {
@@ -977,7 +1287,14 @@ function renderStatistics() {
 
 async function loadStatistics() {
   if (!statsTableBody) return;
-  statsTableBody.innerHTML = `<tr><td colspan="5">${t("stats_loading")}</td></tr>`;
+  statsTableBody.innerHTML = `
+    <tr>
+      <td colspan="5">
+        <div class="skeleton-line" style="width: 88%"></div>
+        <div class="skeleton-line" style="width: 64%"></div>
+      </td>
+    </tr>
+  `;
   refreshStatsButton.disabled = true;
   try {
     const response = await fetch(`${backendUrl}/statistics/validation`);
@@ -1022,11 +1339,65 @@ async function submitChat(event) {
   }
 }
 
+function setupSmoothNavigation() {
+  navLinks.forEach((link) => {
+    link.addEventListener("click", (event) => {
+      const target = document.querySelector(link.getAttribute("href"));
+      if (!target) return;
+      event.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  const sections = ["modelos", "reportes", "chatbot"]
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (!visible) return;
+      navLinks.forEach((link) => {
+        link.classList.toggle("is-active-link", link.getAttribute("href") === `#${visible.target.id}`);
+      });
+    },
+    { rootMargin: "-22% 0px -60% 0px", threshold: [0.16, 0.32, 0.5] },
+  );
+  sections.forEach((section) => observer.observe(section));
+}
+
+function setupOnboarding() {
+  if (!onboarding || localStorage.getItem("afi_seen_onboarding") === "true") return;
+  onboarding.hidden = false;
+}
+
+function closeOnboarding() {
+  localStorage.setItem("afi_seen_onboarding", "true");
+  onboarding.hidden = true;
+}
+
+function openReportFullscreen() {
+  if (!reportPreview.classList.contains("has-document")) {
+    setReportStatusKey("report_generating_preview");
+    fetchProgramReport("pdf", { preview: true });
+    return;
+  }
+
+  if (reportPreview.requestFullscreen) {
+    reportPreview.requestFullscreen();
+  } else if (reportFrame.src) {
+    window.open(reportFrame.src, "_blank", "noreferrer");
+  }
+}
+
 renderFields();
 setPayload(baseSample);
 applyLanguage();
 checkHealth();
 loadStatistics();
+setupSmoothNavigation();
+setupOnboarding();
 
 form.addEventListener("input", () => {
   updateSnapshot();
@@ -1035,6 +1406,13 @@ form.addEventListener("input", () => {
 form.addEventListener("submit", submitPrediction);
 resetButton.addEventListener("click", () => activateScenario("balanced"));
 previewReportButton.addEventListener("click", () => fetchProgramReport("pdf", { preview: true }));
+saveProfileButton.addEventListener("click", saveCurrentProfile);
+profileList.addEventListener("click", handleProfileAction);
+runCompareButton.addEventListener("click", runScenarioComparison);
+predictionHistory.addEventListener("click", handleHistoryAction);
+clearHistoryButton.addEventListener("click", clearPredictionHistory);
+fullscreenReportButton.addEventListener("click", openReportFullscreen);
+onboardingStart.addEventListener("click", closeOnboarding);
 languageToggle.addEventListener("click", () => {
   currentLanguage = currentLanguage === "es" ? "en" : "es";
   localStorage.setItem("afi_language", currentLanguage);

@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Asesor Financiero IA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -68,6 +71,17 @@
             </div>
             <button class="secondary-button" id="reset-button" type="button" data-i18n="reset">Restablecer</button>
           </div>
+          <div class="profile-toolbar">
+            <div>
+              <span data-i18n="saved_profiles">Perfiles guardados</span>
+              <strong id="profile-count">0</strong>
+            </div>
+            <div class="profile-actions">
+              <input id="profile-name-input" type="text" maxlength="32" data-i18n-placeholder="profile_name" placeholder="Nombre del perfil" />
+              <button class="secondary-button" id="save-profile-button" type="button" data-i18n="save_profile">Guardar perfil</button>
+            </div>
+          </div>
+          <div class="profile-list" id="profile-list" aria-live="polite"></div>
           <p class="currency-note" data-i18n="currency_note">Todos los montos monetarios se ingresan en soles peruanos (S/).</p>
 
           <div class="scenario-tabs" aria-label="Escenarios rapidos">
@@ -135,6 +149,22 @@
             </div>
           </div>
 
+          <div class="comparison-panel">
+            <div class="flow-head">
+              <span data-i18n="compare_title">Comparador de escenarios</span>
+              <div class="compare-actions">
+                <select id="compare-scenario">
+                  <option value="healthy" data-i18n="scenario_healthy">Cliente estable</option>
+                  <option value="alert" data-i18n="scenario_alert">Mora elevada</option>
+                </select>
+                <button class="secondary-button" id="run-compare-button" type="button" data-i18n="compare_button">Comparar</button>
+              </div>
+            </div>
+            <div class="compare-grid" id="compare-grid">
+              <div class="compare-empty" data-i18n="compare_hint">Calcula el riesgo y compara el perfil actual contra un escenario alternativo.</div>
+            </div>
+          </div>
+
           <div class="flow-card">
             <div class="flow-head">
               <span data-i18n="balances_vs_payments">Saldos vs pagos</span>
@@ -145,6 +175,14 @@
 
           <div class="notes" id="result-notes">
             <p data-i18n="model_explanation_pending">La explicacion del modelo aparecera aqui despues de calcular.</p>
+          </div>
+
+          <div class="history-panel">
+            <div class="flow-head">
+              <span data-i18n="history_title">Historial de la sesion</span>
+              <button class="text-button" id="clear-history-button" type="button" data-i18n="clear_history">Limpiar</button>
+            </div>
+            <div class="history-list" id="prediction-history" aria-live="polite"></div>
           </div>
         </aside>
       </section>
@@ -205,7 +243,10 @@
           <div class="report-preview" id="program-report-preview">
             <div class="report-preview-head">
               <span data-i18n="preview">Vista previa</span>
-              <strong id="report-preview-title" data-i18n="financial_report">Reporte financiero</strong>
+              <div class="report-preview-actions">
+                <strong id="report-preview-title" data-i18n="financial_report">Reporte financiero</strong>
+                <button class="icon-button" id="fullscreen-report-button" type="button" data-i18n="fullscreen_report">Ampliar</button>
+              </div>
             </div>
             <iframe
               id="program-report-frame"
@@ -272,6 +313,15 @@
         </form>
       </section>
     </main>
+
+    <div class="onboarding" id="onboarding" hidden>
+      <div class="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+        <p class="eyebrow" data-i18n="onboarding_eyebrow">Inicio rapido</p>
+        <h2 id="onboarding-title" data-i18n="onboarding_title">Evalua riesgo financiero con IA en minutos</h2>
+        <p data-i18n="onboarding_copy">Ingresa o carga un perfil, calcula el riesgo, compara escenarios y descarga reportes del programa en PDF, Word o Excel.</p>
+        <button class="primary-link" id="onboarding-start" type="button" data-i18n="onboarding_start">Comenzar</button>
+      </div>
+    </div>
 
     <script src="./app.js"></script>
   </body>
