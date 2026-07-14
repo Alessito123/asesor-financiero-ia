@@ -1827,7 +1827,8 @@ function submitPromptQuestion(promptKey) {
 }
 
 function handleChatPromptClick(event) {
-  const button = event.target.closest("[data-chat-prompt-key]");
+  const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+  const button = target?.closest?.("[data-chat-prompt-key]");
   if (!button) return;
   event.preventDefault();
   submitPromptQuestion(button.dataset.chatPromptKey);
