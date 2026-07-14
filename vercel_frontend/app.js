@@ -1113,6 +1113,7 @@ async function checkHealth() {
 
 async function submitPrediction(event) {
   event.preventDefault();
+  if (isSubmitting) return;
   updateSnapshot();
   if (!validateForm()) {
     resultNotes.innerHTML = `<p>${t("validation_error")}</p>`;
@@ -1404,6 +1405,7 @@ form.addEventListener("input", () => {
   setReportStatusKey("report_stale");
 });
 form.addEventListener("submit", submitPrediction);
+submitButton.addEventListener("click", submitPrediction);
 resetButton.addEventListener("click", () => activateScenario("balanced"));
 previewReportButton.addEventListener("click", () => fetchProgramReport("pdf", { preview: true }));
 saveProfileButton.addEventListener("click", saveCurrentProfile);
