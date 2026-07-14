@@ -34,6 +34,8 @@ const themeToggle = document.querySelector("#theme-toggle");
 const refreshStatsButton = document.querySelector("#refresh-stats-button");
 const productionModel = document.querySelector("#production-model");
 const modelGrid = document.querySelector("#model-grid");
+const modelSelector = document.querySelector("#model-selector");
+const modelSelectorNote = document.querySelector("#model-selector-note");
 const statsTableBody = document.querySelector("#stats-table-body");
 const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
@@ -65,6 +67,7 @@ const driversList = document.querySelector("#drivers-list");
 
 let currentLanguage = localStorage.getItem("afi_language") || "es";
 let currentTheme = localStorage.getItem("afi_theme") || "light";
+let selectedModel = localStorage.getItem("afi_model_name") || "LSTM";
 let reportPreviewUrl = null;
 let latestStats = null;
 let lastPrediction = null;
@@ -97,6 +100,12 @@ const translations = {
     scenario_current: "Perfil actual",
     scenario_healthy: "Cliente estable",
     scenario_alert: "Mora elevada",
+    model_selector_label: "Modelo IA para evaluar",
+    model_selector_note: "LSTM usa el artefacto entrenado; otros modelos quedan como simulacion academica hasta guardar sus archivos entrenados.",
+    model_real: "Usa artefacto entrenado guardado en Render.",
+    model_proxy: "Simulacion academica: falta guardar el artefacto entrenado de este modelo.",
+    model_changed: "Modelo seleccionado",
+    use_model: "Usar modelo",
     personal_data: "Datos personales",
     payment_history: "Historial de pago",
     billed_balances: "Saldos facturados en S/",
@@ -254,6 +263,12 @@ const translations = {
     scenario_current: "Current profile",
     scenario_healthy: "Stable client",
     scenario_alert: "High delay",
+    model_selector_label: "AI model for evaluation",
+    model_selector_note: "LSTM uses the trained artifact; other models remain academic simulations until their trained files are saved.",
+    model_real: "Uses a trained artifact stored in Render.",
+    model_proxy: "Academic simulation: the trained artifact for this model is not saved yet.",
+    model_changed: "Selected model",
+    use_model: "Use model",
     personal_data: "Personal data",
     payment_history: "Payment history",
     billed_balances: "Billed balances in S/",
@@ -750,6 +765,70 @@ function reportFilename(format) {
   return `reporte_financiero_programa_${stamp}.${format}`;
 }
 
+function displayModelName(name) {
+  return String(name || "LSTM").replaceAll("_", "-");
+}
+
+function selectedModelName() {
+  return modelSelector?.value || selectedModel || "LSTM";
+}
+
+function availableModelsByName() {
+  return new Map((latestStats?.available_models || []).map((model) => [model.name, model]));
+}
+
+function modelAvailability(modelName) {
+  const available = availableModelsByName();
+  if (available.has(modelName)) return available.get(modelName);
+  return {
+    name: modelName,
+    artifact_exists: modelName === "LSTM",
+    is_production: modelName === "LSTM",
+    status: modelName === "LSTM" ? "trained" : "proxy",
+  };
+}
+
+function renderModelSelector() {
+  if (!modelSelector) return;
+  const current = selectedModelName();
+  const catalog = latestStats?.model_catalog?.length
+    ? latestStats.model_catalog
+    : [
+        { name: "MLP" },
+        { name: "LSTM" },
+        { name: "GRU" },
+        { name: "CNN_LSTM" },
+        { name: "LSTM_ATTENTION" },
+      ];
+
+  modelSelector.innerHTML = catalog
+    .map((model) => {
+      const info = modelAvailability(model.name);
+      const status = info.artifact_exists ? t("model_real") : t("model_proxy");
+      return `<option value="${model.name}">${displayModelName(model.name)} - ${status}</option>`;
+    })
+    .join("");
+  modelSelector.value = catalog.some((model) => model.name === current) ? current : "LSTM";
+  selectedModel = modelSelector.value;
+  renderModelSelectorNote();
+}
+
+function renderModelSelectorNote() {
+  if (!modelSelectorNote) return;
+  const info = modelAvailability(selectedModelName());
+  modelSelectorNote.textContent = info.artifact_exists ? t("model_real") : t("model_proxy");
+  modelSelectorNote.classList.toggle("is-proxy", !info.artifact_exists);
+}
+
+function selectModel(modelName, { silent = false } = {}) {
+  selectedModel = modelName || "LSTM";
+  localStorage.setItem("afi_model_name", selectedModel);
+  if (modelSelector) modelSelector.value = selectedModel;
+  renderModelSelectorNote();
+  setReportStatusKey("report_stale");
+  if (!silent) showToast(`${t("model_changed")}: ${displayModelName(selectedModel)}`, "success");
+}
+
 function applyTheme() {
   document.documentElement.dataset.theme = currentTheme;
   themeToggle.textContent = t(currentTheme === "dark" ? "theme_light" : "theme_dark");
@@ -787,6 +866,7 @@ function applyLanguage() {
   updateSnapshot();
   renderRiskState();
   renderStatistics();
+  renderModelSelector();
   renderProfiles();
   renderPredictionHistory();
   renderCompareHint();
@@ -929,6 +1009,7 @@ function renderFields() {
 }
 
 function setPayload(payload) {
+  if (payload.model_name) selectModel(payload.model_name, { silent: true });
   for (const [key, value] of Object.entries(payload)) {
     const input = form.elements[key];
     if (input) input.value = value;
@@ -1013,6 +1094,7 @@ function getPayload() {
   const formData = new FormData(form);
   const payload = {};
   for (const [key, value] of formData.entries()) payload[key] = Number(value);
+  payload.model_name = selectedModelName();
   return payload;
 }
 
@@ -1504,10 +1586,11 @@ function renderCompareHint() {
 }
 
 async function predictPayload(payload) {
+  const requestPayload = { ...payload, model_name: payload.model_name || selectedModelName() };
   const response = await fetch(`${backendUrl}/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(requestPayload),
   });
   if (!response.ok) throw new Error("predict");
   return response.json();
@@ -1520,7 +1603,7 @@ function compareCard(title, result, payload) {
     <article class="compare-card ${probability >= 0.7 ? "risk-high" : probability >= 0.4 ? "risk-medium" : "risk-low"}">
       <span>${title}</span>
       <strong>${formatPercent(probability)}</strong>
-      <p>${t(riskLabelKey(probability))} | ${t("coverage")}: ${formatPercent(derived.coverage)} | ${t("max_delay")}: ${
+      <p>${displayModelName(result.model_name || selectedModelName())} | ${t(riskLabelKey(probability))} | ${t("coverage")}: ${formatPercent(derived.coverage)} | ${t("max_delay")}: ${
         derived.maxDelay > 0 ? `${derived.maxDelay}` : t("no_delay")
       }</p>
     </article>
@@ -1558,6 +1641,13 @@ async function runScenarioComparison() {
   }
 }
 
+function handleModelGridClick(event) {
+  const button = event.target.closest("[data-model-select]");
+  if (!button) return;
+  selectModel(button.dataset.modelSelect);
+  document.getElementById("simulador")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function modelTypeLabel(model) {
   const rawType = currentLanguage === "en" ? model.type_en : model.type;
   return rawType === "hybrid" || rawType === "hibrido" ? t("model_type_hybrid") : t("model_type_classic");
@@ -1586,14 +1676,16 @@ function renderStatistics() {
   const comparisonByModel = new Map(comparison.map((row) => [row.model, row]));
   const testsByModel = new Map(tests.map((row) => [row.model, row]));
   productionModel.textContent = latestStats.production_model || "LSTM";
+  renderModelSelector();
 
   modelGrid.innerHTML = (latestStats.model_catalog || [])
     .map((model) => {
       const metrics = comparisonByModel.get(model.name);
       const description = currentLanguage === "en" ? model.description_en : model.description;
       const selectedClass = model.name === latestStats.production_model ? " is-selected" : "";
+      const availability = modelAvailability(model.name);
       return `
-        <article class="model-card${selectedClass}">
+        <article class="model-card${selectedClass}" data-model-card="${model.name}">
           <div>
             <span>${modelTypeLabel(model)}</span>
             <strong>${model.name.replaceAll("_", "-")}</strong>
@@ -1603,6 +1695,9 @@ function renderStatistics() {
             <div><dt>${t("auc_label")}</dt><dd>${formatDecimal(metrics?.roc_auc_mean, 3)}</dd></div>
             <div><dt>${t("f1_label")}</dt><dd>${formatDecimal(metrics?.f1_mean, 3)}</dd></div>
           </dl>
+          <button class="secondary-button small" type="button" data-model-select="${model.name}">
+            ${t("use_model")} ${availability.artifact_exists ? "" : "(proxy)"}
+          </button>
         </article>
       `;
     })
@@ -1812,6 +1907,8 @@ themeToggle.addEventListener("click", () => {
   applyTheme();
 });
 refreshStatsButton.addEventListener("click", loadStatistics);
+modelSelector.addEventListener("change", () => selectModel(modelSelector.value));
+modelGrid.addEventListener("click", handleModelGridClick);
 chatForm.addEventListener("submit", submitChat);
 chatSubmitButton.addEventListener("click", submitChat);
 chatInput.addEventListener("keydown", (event) => {

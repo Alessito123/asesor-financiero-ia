@@ -42,6 +42,7 @@ class TrainConfig:
     batch_size: int = 128
     random_state: int = 42
     run_tuning: bool = True
+    save_all_models: bool = True
 
 
 def import_tensorflow():
@@ -465,7 +466,41 @@ def train_final_model(df: pd.DataFrame, comparison: pd.DataFrame, config: TrainC
     MODELS.mkdir(parents=True, exist_ok=True)
     model.save(MODELS / "best_model.keras")
     model.save(MODELS / "best_model.h5")
+    model.save(MODELS / f"{best_name}.keras")
     joblib.dump(scaler, MODELS / "preprocessor.joblib")
+    model_artifacts = {
+        best_name: {
+            "path": str((MODELS / f"{best_name}.keras").relative_to(ROOT)),
+            "input_shape": input_shape,
+            "source": "best_tuned_model",
+        }
+    }
+
+    if config.save_all_models:
+        tf, _, _ = import_tensorflow()
+        for candidate_name, (candidate_shape, builder) in MODEL_BUILDERS.items():
+            if candidate_name == best_name:
+                continue
+            tf.keras.backend.clear_session()
+            start = time.perf_counter()
+            candidate_model = builder(X_train_scaled.shape[1], 0.001)
+            candidate_model.fit(
+                reshape_for_model(X_train_scaled, candidate_shape),
+                y_train.to_numpy(),
+                validation_data=(reshape_for_model(X_valid_scaled, candidate_shape), y_valid.to_numpy()),
+                epochs=config.epochs,
+                batch_size=config.batch_size,
+                verbose=0,
+            )
+            elapsed = time.perf_counter() - start
+            candidate_path = MODELS / f"{candidate_name}.keras"
+            candidate_model.save(candidate_path)
+            model_artifacts[candidate_name] = {
+                "path": str(candidate_path.relative_to(ROOT)),
+                "input_shape": candidate_shape,
+                "source": "final_architecture_fit",
+                "fit_seconds": elapsed,
+            }
 
     metadata = {
         "best_model": best_name,
@@ -474,6 +509,7 @@ def train_final_model(df: pd.DataFrame, comparison: pd.DataFrame, config: TrainC
         "final_metrics": final_metrics,
         "best_cv_row": best_row.to_dict(),
         "best_tuning_record": tuning_record,
+        "model_artifacts": model_artifacts,
         "dataset": "UCI Default of Credit Card Clients",
     }
     (MODELS / "model_metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
@@ -486,6 +522,7 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--no-tuning", action="store_true")
+    parser.add_argument("--no-save-all-models", action="store_true")
     args = parser.parse_args()
 
     config = TrainConfig(
@@ -493,6 +530,7 @@ def main() -> None:
         epochs=args.epochs,
         batch_size=args.batch_size,
         run_tuning=not args.no_tuning,
+        save_all_models=not args.no_save_all_models,
     )
     OUTPUTS.mkdir(parents=True, exist_ok=True)
     df = load_uci_dataset()

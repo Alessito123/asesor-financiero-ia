@@ -99,6 +99,18 @@
             <button class="scenario-button" type="button" data-scenario="alert" data-i18n="scenario_alert">Mora elevada</button>
           </div>
 
+          <div class="model-selector-panel">
+            <label for="model-selector" data-i18n="model_selector_label">Modelo IA para evaluar</label>
+            <select id="model-selector" aria-describedby="model-selector-note">
+              <option value="LSTM">LSTM</option>
+              <option value="MLP">MLP</option>
+              <option value="GRU">GRU</option>
+              <option value="CNN_LSTM">CNN-LSTM</option>
+              <option value="LSTM_ATTENTION">LSTM-Attention</option>
+            </select>
+            <p id="model-selector-note" data-i18n="model_selector_note">LSTM usa el artefacto entrenado; otros modelos quedan como simulacion academica hasta guardar sus archivos entrenados.</p>
+          </div>
+
           <div class="wizard-steps" id="wizard-steps" aria-label="Pasos del simulador">
             <button class="wizard-step is-active" type="button" data-step="0">
               <span>1</span>

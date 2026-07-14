@@ -25,6 +25,7 @@ from ml.statistical_validation import statistical_validation_summary
 
 
 class PredictionRequest(BaseModel):
+    model_name: str = Field("LSTM", pattern="^(MLP|LSTM|GRU|CNN_LSTM|CNN-LSTM|LSTM_ATTENTION|LSTM-ATTENTION)$")
     LIMIT_BAL: float = Field(..., ge=1, le=10_000_000, description="Monto de credito concedido")
     SEX: int = Field(2, ge=1, le=2)
     EDUCATION: int = Field(2, ge=1, le=4)
@@ -58,6 +59,10 @@ class PredictionResponse(BaseModel):
     prediction: int
     explanation: List[str]
     model_name: str
+    requested_model: str = "LSTM"
+    model_available: bool = False
+    model_status: str = ""
+    artifact_path: Optional[str] = None
 
 
 class ChatbotRequest(BaseModel):
@@ -381,7 +386,7 @@ def recommendations(result: Dict, indicators: Dict) -> List[str]:
 
 def report_context(request: PredictionRequest) -> Dict:
     payload = request.model_dump()
-    result = predictor.predict(payload)
+    result = predictor.predict(payload, request.model_name)
     indicators = financial_indicators(payload)
     return {
         "payload": payload,
@@ -837,13 +842,16 @@ def model_info() -> Dict:
         "mode": predictor.mode,
         "features": FEATURE_COLUMNS,
         "metadata": predictor.metadata,
+        "available_models": predictor.available_models(),
         "sample_payload": DEFAULT_SAMPLE,
     }
 
 
 @app.get("/statistics/validation")
 def statistics_validation() -> Dict:
-    return statistical_validation_summary()
+    summary = statistical_validation_summary()
+    summary["available_models"] = predictor.available_models()
+    return summary
 
 
 @app.post("/chatbot", response_model=ChatbotResponse)
@@ -853,7 +861,7 @@ def chatbot(request: ChatbotRequest) -> Dict:
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest) -> Dict:
-    return predictor.predict(request.model_dump())
+    return predictor.predict(request.model_dump(), request.model_name)
 
 
 @app.post("/reports/financial/pdf")

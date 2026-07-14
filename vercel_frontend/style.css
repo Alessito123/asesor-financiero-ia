@@ -507,6 +507,34 @@ h2 {
   color: var(--teal);
 }
 
+.model-selector-panel {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--subtle-bg);
+  padding: 12px;
+}
+
+.model-selector-panel label {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.model-selector-panel p {
+  margin: 0;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.model-selector-panel p.is-proxy {
+  color: var(--amber);
+}
+
 .wizard-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
