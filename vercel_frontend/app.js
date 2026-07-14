@@ -37,6 +37,7 @@ const modelGrid = document.querySelector("#model-grid");
 const statsTableBody = document.querySelector("#stats-table-body");
 const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
+const chatSubmitButton = document.querySelector("#chat-form button");
 const chatMessages = document.querySelector("#chat-messages");
 const chatPanel = document.querySelector("#chatbot");
 const chatLauncher = document.querySelector("#chat-launcher");
@@ -68,6 +69,7 @@ let reportPreviewUrl = null;
 let latestStats = null;
 let lastPrediction = null;
 let isSubmitting = false;
+let isChatSubmitting = false;
 let currentWizardStep = 0;
 let statusState = { state: null, key: "api_connecting", params: {} };
 let reportState = { key: "report_ready", isError: false, params: {} };
@@ -1668,8 +1670,11 @@ async function streamChatMessage(element, text) {
 
 async function submitChat(event) {
   event.preventDefault();
+  if (isChatSubmitting) return;
   const message = chatInput.value.trim();
   if (!message) return;
+  isChatSubmitting = true;
+  chatSubmitButton.disabled = true;
   addChatMessage(message, "user");
   chatInput.value = "";
   const pending = addChatMessage(t("chat_typing"), "bot");
@@ -1690,6 +1695,9 @@ async function submitChat(event) {
   } catch (error) {
     pending.textContent = error.message || t("chat_error");
     showToast(error.message || t("chat_error"), "error");
+  } finally {
+    isChatSubmitting = false;
+    chatSubmitButton.disabled = false;
   }
 }
 
@@ -1805,6 +1813,12 @@ themeToggle.addEventListener("click", () => {
 });
 refreshStatsButton.addEventListener("click", loadStatistics);
 chatForm.addEventListener("submit", submitChat);
+chatSubmitButton.addEventListener("click", submitChat);
+chatInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    submitChat(event);
+  }
+});
 
 reportButtons.forEach((button) => {
   button.addEventListener("click", () => fetchProgramReport(button.dataset.reportFormat));
