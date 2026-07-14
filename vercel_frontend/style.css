@@ -502,12 +502,70 @@ h2 {
   color: var(--teal);
 }
 
+.wizard-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 20px;
+}
+
+.wizard-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 58px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--subtle-bg);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 10px;
+  text-align: left;
+  transition: transform var(--transition), border-color var(--transition), background var(--transition), color var(--transition);
+}
+
+.wizard-step span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--badge-ink);
+  font-weight: 950;
+}
+
+.wizard-step strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.wizard-step:hover,
+.wizard-step.is-active,
+.wizard-step.is-done {
+  border-color: var(--teal-border);
+  background: var(--accent-soft);
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.wizard-step.is-active span,
+.wizard-step.is-done span {
+  background: var(--teal);
+  color: #fff;
+}
+
 .form-section {
   min-width: 0;
   margin: 0;
   border: 0;
   border-top: 1px solid var(--line);
   padding: 20px 0 0;
+}
+
+.form-section[hidden] {
+  display: none;
 }
 
 .form-section + .form-section {
@@ -566,6 +624,28 @@ h2 {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.wizard-actions .secondary-button {
+  min-width: 128px;
+}
+
+.wizard-actions .secondary-button:disabled {
+  cursor: default;
+  opacity: 0.48;
+  transform: none;
+}
+
+.primary-button[hidden],
+.secondary-button[hidden] {
+  display: none;
 }
 
 input,
@@ -686,6 +766,7 @@ select.is-valid {
 }
 
 .comparison-panel,
+.drivers-panel,
 .history-panel {
   margin-top: 18px;
   border-top: 1px solid var(--line);
@@ -750,6 +831,77 @@ select.is-valid {
   color: var(--muted);
   padding: 14px;
   text-align: center;
+}
+
+.drivers-list {
+  display: grid;
+  gap: 10px;
+}
+
+.driver-item {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--subtle-bg);
+  padding: 12px;
+}
+
+.driver-main {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.driver-main span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.driver-main strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+}
+
+.driver-main b {
+  color: var(--risk-color);
+  font-size: 18px;
+}
+
+.driver-bar {
+  height: 7px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.driver-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--risk-color);
+  transition: width 0.8s ease;
+}
+
+.driver-item p {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.driver-item.is-risk {
+  --risk-color: var(--red);
+}
+
+.driver-item.is-protective {
+  --risk-color: var(--green);
 }
 
 .flow-chart {
@@ -1289,6 +1441,7 @@ select.is-valid {
 
   .metrics-strip,
   .scenario-tabs,
+  .wizard-steps,
   .field-grid,
   .compact,
   .risk-meter,
@@ -1296,9 +1449,18 @@ select.is-valid {
   .model-grid,
   .chat-form,
   .profile-actions,
+  .wizard-actions,
   .compare-actions,
   .compare-grid {
     grid-template-columns: 1fr;
+  }
+
+  .wizard-actions {
+    display: grid;
+  }
+
+  .wizard-actions .secondary-button {
+    width: 100%;
   }
 
   .metrics-strip div + div,

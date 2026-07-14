@@ -51,6 +51,11 @@ const clearHistoryButton = document.querySelector("#clear-history-button");
 const fullscreenReportButton = document.querySelector("#fullscreen-report-button");
 const onboarding = document.querySelector("#onboarding");
 const onboardingStart = document.querySelector("#onboarding-start");
+const wizardSteps = document.querySelectorAll("[data-step]");
+const wizardSections = document.querySelectorAll("[data-wizard-step]");
+const wizardPrev = document.querySelector("#wizard-prev");
+const wizardNext = document.querySelector("#wizard-next");
+const driversList = document.querySelector("#drivers-list");
 
 let currentLanguage = localStorage.getItem("afi_language") || "es";
 let currentTheme = localStorage.getItem("afi_theme") || "light";
@@ -58,6 +63,7 @@ let reportPreviewUrl = null;
 let latestStats = null;
 let lastPrediction = null;
 let isSubmitting = false;
+let currentWizardStep = 0;
 let statusState = { state: null, key: "api_connecting", params: {} };
 let reportState = { key: "report_ready", isError: false, params: {} };
 let predictionHistoryItems = readStoredArray("afi_prediction_history");
@@ -188,6 +194,27 @@ const translations = {
     no_history: "Aun no hay predicciones en esta sesion.",
     reload_profile: "Usar perfil",
     fullscreen_report: "Ampliar",
+    wizard_step_profile: "Perfil",
+    wizard_step_history: "Historial",
+    wizard_step_payments: "Pagos",
+    wizard_prev: "Anterior",
+    wizard_next: "Siguiente",
+    drivers_title: "Factores explicativos",
+    drivers_method: "XAI operativo",
+    drivers_hint: "Calcula el riesgo para ver que variables empujan o reducen el resultado.",
+    driver_increases: "Aumenta riesgo",
+    driver_reduces: "Reduce riesgo",
+    driver_delay: "Mora reciente",
+    driver_delay_desc: "{value} meses de atraso maximo detectado.",
+    driver_coverage: "Cobertura de pagos",
+    driver_coverage_desc: "Pago acumulado de {value} frente a saldos.",
+    driver_usage: "Uso de credito",
+    driver_usage_desc: "Uso promedio de {value} del limite disponible.",
+    driver_limit: "Capacidad aprobada",
+    driver_limit_desc: "Limite de credito de {value}.",
+    driver_age: "Madurez financiera",
+    driver_age_desc: "Edad registrada: {value} anos.",
+    driver_no_signals: "El perfil no muestra factores extremos; se mantiene como riesgo bajo relativo.",
     onboarding_eyebrow: "Inicio rapido",
     onboarding_title: "Evalua riesgo financiero con IA en minutos",
     onboarding_copy: "Ingresa o carga un perfil, calcula el riesgo, compara escenarios y descarga reportes del programa en PDF, Word o Excel.",
@@ -318,6 +345,27 @@ const translations = {
     no_history: "No predictions in this session yet.",
     reload_profile: "Use profile",
     fullscreen_report: "Expand",
+    wizard_step_profile: "Profile",
+    wizard_step_history: "History",
+    wizard_step_payments: "Payments",
+    wizard_prev: "Previous",
+    wizard_next: "Next",
+    drivers_title: "Explanatory factors",
+    drivers_method: "Operational XAI",
+    drivers_hint: "Calculate risk to see which variables push or reduce the result.",
+    driver_increases: "Increases risk",
+    driver_reduces: "Reduces risk",
+    driver_delay: "Recent delay",
+    driver_delay_desc: "{value} months of maximum delay detected.",
+    driver_coverage: "Payment coverage",
+    driver_coverage_desc: "Accumulated payment of {value} against balances.",
+    driver_usage: "Credit usage",
+    driver_usage_desc: "Average usage of {value} of the available limit.",
+    driver_limit: "Approved capacity",
+    driver_limit_desc: "Credit limit of {value}.",
+    driver_age: "Financial maturity",
+    driver_age_desc: "Registered age: {value} years.",
+    driver_no_signals: "The profile does not show extreme factors; it remains a relatively low risk case.",
     onboarding_eyebrow: "Quick start",
     onboarding_title: "Evaluate financial risk with AI in minutes",
     onboarding_copy: "Enter or load a profile, calculate risk, compare scenarios and download program reports as PDF, Word or Excel.",
@@ -687,11 +735,13 @@ function applyLanguage() {
   renderProfiles();
   renderPredictionHistory();
   renderCompareHint();
+  updateWizard();
   if (!lastPrediction) {
     modelMode.textContent = t("no_calculation");
     riskLabel.textContent = t("waiting_data");
     riskCopy.textContent = t("waiting_copy");
     resultNotes.innerHTML = `<p>${t("model_explanation_pending")}</p>`;
+    renderDriverHint();
   }
   if (!isSubmitting) submitButton.textContent = t("calculate_risk");
 }
@@ -933,6 +983,42 @@ function validateForm() {
   return results.every(Boolean);
 }
 
+function getWizardControls(step) {
+  return Array.from(form.querySelectorAll(`[data-wizard-step="${step}"] input, [data-wizard-step="${step}"] select`));
+}
+
+function validateWizardStep(step) {
+  const controls = getWizardControls(step);
+  return controls.map(validateField).every(Boolean);
+}
+
+function updateWizard() {
+  if (!wizardSteps.length || !wizardSections.length) return;
+  wizardSections.forEach((section) => {
+    section.hidden = Number(section.dataset.wizardStep) !== currentWizardStep;
+  });
+  wizardSteps.forEach((button) => {
+    const step = Number(button.dataset.step);
+    const isActive = step === currentWizardStep;
+    button.classList.toggle("is-active", isActive);
+    button.classList.toggle("is-done", step < currentWizardStep);
+    button.setAttribute("aria-current", isActive ? "step" : "false");
+  });
+  wizardPrev.disabled = currentWizardStep === 0;
+  wizardNext.hidden = currentWizardStep === 2;
+  submitButton.hidden = currentWizardStep !== 2;
+}
+
+function goToWizardStep(step, options = {}) {
+  const nextStep = Math.max(0, Math.min(2, Number(step)));
+  if (options.validateCurrent && nextStep > currentWizardStep && !validateWizardStep(currentWizardStep)) {
+    resultNotes.innerHTML = `<p>${t("validation_error")}</p>`;
+    return;
+  }
+  currentWizardStep = nextStep;
+  updateWizard();
+}
+
 function getSeries(payload, prefix) {
   return [1, 2, 3, 4, 5, 6].map((month) => Number(payload[`${prefix}${month}`]) || 0);
 }
@@ -956,6 +1042,142 @@ function calculateDerived(payload) {
     totalBills,
     totalPayments,
   };
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function buildRiskDrivers(payload) {
+  const derived = calculateDerived(payload);
+  const limit = Number(payload.LIMIT_BAL) || 0;
+  const age = Number(payload.AGE) || 0;
+  const drivers = [];
+
+  if (derived.maxDelay > 0) {
+    drivers.push({
+      labelKey: "driver_delay",
+      descriptionKey: "driver_delay_desc",
+      direction: "increase",
+      impact: clamp(0.05 + derived.maxDelay * 0.055, 0.05, 0.32),
+      params: { value: derived.maxDelay },
+    });
+  }
+
+  if (derived.coverage < 0.08) {
+    drivers.push({
+      labelKey: "driver_coverage",
+      descriptionKey: "driver_coverage_desc",
+      direction: "increase",
+      impact: clamp(0.14 - derived.coverage, 0.06, 0.18),
+      params: { value: formatPercent(derived.coverage) },
+    });
+  } else if (derived.coverage > 0.18) {
+    drivers.push({
+      labelKey: "driver_coverage",
+      descriptionKey: "driver_coverage_desc",
+      direction: "reduce",
+      impact: clamp(derived.coverage * 0.34, 0.06, 0.18),
+      params: { value: formatPercent(derived.coverage) },
+    });
+  }
+
+  if (derived.usage > 0.65) {
+    drivers.push({
+      labelKey: "driver_usage",
+      descriptionKey: "driver_usage_desc",
+      direction: "increase",
+      impact: clamp((derived.usage - 0.55) * 0.22, 0.05, 0.20),
+      params: { value: formatPercent(derived.usage) },
+    });
+  } else if (derived.usage < 0.25) {
+    drivers.push({
+      labelKey: "driver_usage",
+      descriptionKey: "driver_usage_desc",
+      direction: "reduce",
+      impact: clamp((0.3 - derived.usage) * 0.28, 0.04, 0.12),
+      params: { value: formatPercent(derived.usage) },
+    });
+  }
+
+  if (limit >= 250000) {
+    drivers.push({
+      labelKey: "driver_limit",
+      descriptionKey: "driver_limit_desc",
+      direction: "reduce",
+      impact: 0.07,
+      params: { value: formatMoney(limit) },
+    });
+  } else if (limit > 0 && limit < 80000) {
+    drivers.push({
+      labelKey: "driver_limit",
+      descriptionKey: "driver_limit_desc",
+      direction: "increase",
+      impact: 0.06,
+      params: { value: formatMoney(limit) },
+    });
+  }
+
+  if (age > 0 && age < 25) {
+    drivers.push({
+      labelKey: "driver_age",
+      descriptionKey: "driver_age_desc",
+      direction: "increase",
+      impact: 0.04,
+      params: { value: age },
+    });
+  } else if (age >= 45) {
+    drivers.push({
+      labelKey: "driver_age",
+      descriptionKey: "driver_age_desc",
+      direction: "reduce",
+      impact: 0.04,
+      params: { value: age },
+    });
+  }
+
+  return drivers.sort((a, b) => b.impact - a.impact).slice(0, 5);
+}
+
+function renderDriverHint() {
+  if (!driversList) return;
+  driversList.innerHTML = `<div class="compare-empty">${t("drivers_hint")}</div>`;
+}
+
+function renderRiskDrivers(payload) {
+  if (!driversList) return;
+  if (!payload) {
+    renderDriverHint();
+    return;
+  }
+
+  const drivers = buildRiskDrivers(payload);
+  if (!drivers.length) {
+    driversList.innerHTML = `<div class="compare-empty">${t("driver_no_signals")}</div>`;
+    return;
+  }
+
+  driversList.innerHTML = drivers
+    .map((driver) => {
+      const isRisk = driver.direction === "increase";
+      const width = Math.round(clamp((driver.impact / 0.32) * 100, 16, 100));
+      return `
+        <article class="driver-item ${isRisk ? "is-risk" : "is-protective"}">
+          <div class="driver-main">
+            <div>
+              <span>${t(isRisk ? "driver_increases" : "driver_reduces")}</span>
+              <strong>${t(driver.labelKey)}</strong>
+            </div>
+            <b>${isRisk ? "+" : "-"}${formatPercent(driver.impact)}</b>
+          </div>
+          <div class="driver-bar" aria-hidden="true">
+            <i style="width: ${width}%"></i>
+          </div>
+          <p>${t(driver.descriptionKey, driver.params)}</p>
+        </article>
+      `;
+    })
+    .join("");
 }
 
 function drawFlowChart(payload) {
@@ -1016,7 +1238,7 @@ function riskCopyKey(probability) {
 
 function renderRiskState() {
   if (!lastPrediction) return;
-  const { probability, data } = lastPrediction;
+  const { probability, data, payload } = lastPrediction;
   const percent = Math.round(probability * 100);
   const riskClass =
     probability >= 0.7 ? "risk-high" : probability >= 0.4 ? "risk-medium" : "risk-low";
@@ -1039,10 +1261,11 @@ function renderRiskState() {
     } ${t("with_threshold")} ${formatPercent(data.threshold)}.</p>
     <ul>${notes}</ul>
   `;
+  renderRiskDrivers(payload);
 }
 
-function setRiskState(probability, label, data) {
-  lastPrediction = { probability, label, data };
+function setRiskState(probability, label, data, payload) {
+  lastPrediction = { probability, label, data, payload };
   renderRiskState();
 }
 
@@ -1114,6 +1337,10 @@ async function checkHealth() {
 async function submitPrediction(event) {
   event.preventDefault();
   if (isSubmitting) return;
+  if (currentWizardStep < 2) {
+    goToWizardStep(currentWizardStep + 1, { validateCurrent: true });
+    return;
+  }
   updateSnapshot();
   if (!validateForm()) {
     resultNotes.innerHTML = `<p>${t("validation_error")}</p>`;
@@ -1135,7 +1362,7 @@ async function submitPrediction(event) {
 
     if (!response.ok) throw new Error("predict");
     const data = await response.json();
-    setRiskState(Number(data.probability), data.risk_label, data);
+    setRiskState(Number(data.probability), data.risk_label, data, payload);
     addPredictionHistory(payload, data);
     fetchProgramReport("pdf", { preview: true });
   } catch {
@@ -1146,6 +1373,7 @@ async function submitPrediction(event) {
     riskCopy.textContent = t("render_connection_error");
     modelMode.textContent = "Error";
     resultNotes.innerHTML = `<p>${t("check_backend")}</p>`;
+    renderDriverHint();
   } finally {
     isSubmitting = false;
     submitButton.disabled = false;
@@ -1399,6 +1627,8 @@ checkHealth();
 loadStatistics();
 setupSmoothNavigation();
 setupOnboarding();
+updateWizard();
+renderDriverHint();
 
 form.addEventListener("input", () => {
   updateSnapshot();
@@ -1410,6 +1640,8 @@ resetButton.addEventListener("click", () => activateScenario("balanced"));
 previewReportButton.addEventListener("click", () => fetchProgramReport("pdf", { preview: true }));
 saveProfileButton.addEventListener("click", saveCurrentProfile);
 profileList.addEventListener("click", handleProfileAction);
+wizardPrev.addEventListener("click", () => goToWizardStep(currentWizardStep - 1));
+wizardNext.addEventListener("click", () => goToWizardStep(currentWizardStep + 1, { validateCurrent: true }));
 runCompareButton.addEventListener("click", runScenarioComparison);
 predictionHistory.addEventListener("click", handleHistoryAction);
 clearHistoryButton.addEventListener("click", clearPredictionHistory);
@@ -1434,4 +1666,11 @@ reportButtons.forEach((button) => {
 
 document.querySelectorAll(".scenario-button").forEach((button) => {
   button.addEventListener("click", () => activateScenario(button.dataset.scenario));
+});
+
+wizardSteps.forEach((button) => {
+  button.addEventListener("click", () => {
+    const step = Number(button.dataset.step);
+    goToWizardStep(step, { validateCurrent: step > currentWizardStep });
+  });
 });

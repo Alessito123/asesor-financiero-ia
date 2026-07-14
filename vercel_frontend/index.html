@@ -3,6 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Asesor Financiero IA evalua riesgo crediticio personal con modelos neuronales, FastAPI, reportes y explicabilidad operativa." />
+    <meta name="theme-color" content="#0A0D14" />
+    <meta property="og:title" content="Asesor Financiero IA" />
+    <meta property="og:description" content="Dashboard fintech para evaluar riesgo crediticio con IA, comparar escenarios y generar reportes financieros." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://vercelfrontend-peach.vercel.app/" />
     <title>Asesor Financiero IA</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -90,25 +96,45 @@
             <button class="scenario-button" type="button" data-scenario="alert" data-i18n="scenario_alert">Mora elevada</button>
           </div>
 
-          <fieldset class="form-section">
+          <div class="wizard-steps" id="wizard-steps" aria-label="Pasos del simulador">
+            <button class="wizard-step is-active" type="button" data-step="0">
+              <span>1</span>
+              <strong data-i18n="wizard_step_profile">Perfil</strong>
+            </button>
+            <button class="wizard-step" type="button" data-step="1">
+              <span>2</span>
+              <strong data-i18n="wizard_step_history">Historial</strong>
+            </button>
+            <button class="wizard-step" type="button" data-step="2">
+              <span>3</span>
+              <strong data-i18n="wizard_step_payments">Pagos</strong>
+            </button>
+          </div>
+
+          <fieldset class="form-section" data-wizard-step="0">
             <legend data-i18n="personal_data">Datos personales</legend>
             <div class="field-grid" id="profile-fields"></div>
           </fieldset>
 
-          <fieldset class="form-section">
+          <fieldset class="form-section" data-wizard-step="1">
             <legend data-i18n="payment_history">Historial de pago</legend>
             <div class="field-grid compact" id="payment-history-fields"></div>
           </fieldset>
 
-          <fieldset class="form-section">
+          <fieldset class="form-section" data-wizard-step="2">
             <legend data-i18n="billed_balances">Saldos facturados en S/</legend>
             <div class="field-grid compact" id="bill-fields"></div>
           </fieldset>
 
-          <fieldset class="form-section">
+          <fieldset class="form-section" data-wizard-step="2">
             <legend data-i18n="payments_done">Pagos realizados en S/</legend>
             <div class="field-grid compact" id="payment-amount-fields"></div>
           </fieldset>
+
+          <div class="wizard-actions">
+            <button class="secondary-button" id="wizard-prev" type="button" data-i18n="wizard_prev">Anterior</button>
+            <button class="secondary-button" id="wizard-next" type="button" data-i18n="wizard_next">Siguiente</button>
+          </div>
 
           <button class="primary-button" id="submit-button" type="submit" data-i18n="calculate_risk">
             Calcular riesgo
@@ -146,6 +172,16 @@
             <div>
               <span data-i18n="max_delay">Mora maxima</span>
               <strong id="delay-value">--</strong>
+            </div>
+          </div>
+
+          <div class="drivers-panel">
+            <div class="flow-head">
+              <span data-i18n="drivers_title">Factores explicativos</span>
+              <strong data-i18n="drivers_method">XAI operativo</strong>
+            </div>
+            <div class="drivers-list" id="drivers-list" aria-live="polite">
+              <div class="compare-empty" data-i18n="drivers_hint">Calcula el riesgo para ver que variables explican el resultado.</div>
             </div>
           </div>
 
