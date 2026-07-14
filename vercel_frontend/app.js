@@ -44,6 +44,7 @@ const chatMessages = document.querySelector("#chat-messages");
 const chatPanel = document.querySelector("#chatbot");
 const chatLauncher = document.querySelector("#chat-launcher");
 const chatClose = document.querySelector("#chat-close");
+const chatPromptButtons = document.querySelectorAll("[data-chat-prompt-key]");
 const toastStack = document.querySelector("#toast-stack");
 const navLinks = document.querySelectorAll('.ghost-link[href^="#"]');
 const profileNameInput = document.querySelector("#profile-name-input");
@@ -187,10 +188,18 @@ const translations = {
     chat_mode: "Soporte academico",
     chat_launcher: "Asistente IA",
     chat_close: "Cerrar",
-    chat_welcome: "Hola, puedo explicar el modelo LSTM, los 5 modelos entrenados, reportes y pruebas estadisticas.",
+    chat_welcome: "Hola, soy el asistente del Asesor Financiero IA. Puedo explicar para que sirve la app, que modelo usar, tu riesgo, reportes y pruebas estadisticas.",
     chat_placeholder: "Pregunta sobre modelos, reportes o riesgo",
     chat_error: "No pude responder ahora. Revisa la conexion con Render.",
     chat_typing: "Consultando al asistente...",
+    chat_prompt_purpose: "Para que sirve?",
+    chat_prompt_model: "Que modelo uso?",
+    chat_prompt_risk: "Explica mi riesgo",
+    chat_prompt_reports: "Reportes",
+    chat_prompt_purpose_full: "Para que sirve esta app y que problema resuelve?",
+    chat_prompt_model_full: "Que modelo debo usar y por que?",
+    chat_prompt_risk_full: "Explica mi riesgo actual con los factores principales.",
+    chat_prompt_reports_full: "Que reportes puedo descargar y para que sirve cada uno?",
     send: "Enviar",
     saved_profiles: "Perfiles guardados",
     save_profile: "Guardar perfil",
@@ -350,10 +359,18 @@ const translations = {
     chat_mode: "Academic support",
     chat_launcher: "AI Assistant",
     chat_close: "Close",
-    chat_welcome: "Hi, I can explain the LSTM model, the 5 trained models, reports and statistical tests.",
+    chat_welcome: "Hi, I am the Financial AI Advisor assistant. I can explain what the app does, which model to use, your risk, reports and statistical tests.",
     chat_placeholder: "Ask about models, reports or risk",
     chat_error: "I could not answer now. Check the Render connection.",
     chat_typing: "Asking the assistant...",
+    chat_prompt_purpose: "What is it for?",
+    chat_prompt_model: "Which model?",
+    chat_prompt_risk: "Explain my risk",
+    chat_prompt_reports: "Reports",
+    chat_prompt_purpose_full: "What is this app for and what problem does it solve?",
+    chat_prompt_model_full: "Which model should I use and why?",
+    chat_prompt_risk_full: "Explain my current risk with the main factors.",
+    chat_prompt_reports_full: "Which reports can I download and what is each one for?",
     send: "Send",
     saved_profiles: "Saved profiles",
     save_profile: "Save profile",
@@ -1330,6 +1347,10 @@ function buildChatPredictionContext() {
     probability,
     risk_label: t(riskLabelKey(probability)),
     model_name: data.model_name,
+    selected_model: selectedModelName(),
+    requested_model: data.requested_model,
+    model_available: data.model_available,
+    model_status: data.model_status,
     mode: data.mode,
     threshold: data.threshold,
     prediction: data.prediction,
@@ -1799,6 +1820,13 @@ async function submitChat(event) {
   }
 }
 
+function submitPromptQuestion(promptKey) {
+  const question = t(promptKey);
+  if (!question || question === promptKey) return;
+  chatInput.value = question;
+  submitChat({ preventDefault() {} });
+}
+
 function openChatDrawer() {
   chatPanel.classList.add("is-open");
   chatLauncher.setAttribute("aria-expanded", "true");
@@ -1914,6 +1942,9 @@ modelSelector.addEventListener("change", () => selectModel(modelSelector.value))
 modelGrid.addEventListener("click", handleModelGridClick);
 chatForm.addEventListener("submit", submitChat);
 chatSubmitButton.addEventListener("click", submitChat);
+chatPromptButtons.forEach((button) => {
+  button.addEventListener("click", () => submitPromptQuestion(button.dataset.chatPromptKey));
+});
 chatInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
     submitChat(event);

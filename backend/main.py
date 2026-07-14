@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+import unicodedata
 from collections import defaultdict, deque
 from datetime import datetime
 from io import BytesIO
@@ -235,6 +236,54 @@ ACADEMIC_KNOWLEDGE = [
         "en": (
             "Operational explainability summarizes factors such as recent delay, payment coverage, credit usage, "
             "approved limit and age. It is an interpretable approximation that accompanies the neural prediction."
+        ),
+    },
+    {
+        "id": "app_purpose",
+        "keywords": ["para que", "que hace", "programa", "app", "aplicacion", "sistema", "sirve", "purpose"],
+        "es": (
+            "La aplicacion sirve para estimar riesgo de incumplimiento financiero, simular escenarios, explicar "
+            "factores de riesgo y generar reportes del analisis para un proyecto academico de IA financiera."
+        ),
+        "en": (
+            "The app estimates financial default risk, simulates scenarios, explains risk drivers and generates "
+            "analysis reports for an academic financial AI project."
+        ),
+    },
+    {
+        "id": "model_recommendation",
+        "keywords": ["que modelo", "cual modelo", "recomienda", "debo usar", "seleccionar", "usar modelo", "best model"],
+        "es": (
+            "Para uso principal se recomienda el modelo guardado en produccion. Para comparacion academica se pueden "
+            "seleccionar los cinco modelos y revisar AUC, F1, tiempo de proceso y pruebas estadisticas."
+        ),
+        "en": (
+            "For the main workflow, use the saved production model. For academic comparison, select the five models "
+            "and review AUC, F1, processing time and statistical tests."
+        ),
+    },
+    {
+        "id": "user_workflow",
+        "keywords": ["como uso", "como funciona", "pasos", "usuario", "llenar", "formulario", "workflow"],
+        "es": (
+            "El flujo recomendado es ingresar perfil del cliente, historial de mora, saldos y pagos; elegir el modelo; "
+            "calcular riesgo; revisar factores explicativos; comparar escenarios y descargar reportes."
+        ),
+        "en": (
+            "The recommended workflow is to enter client profile, delay history, balances and payments; choose a model; "
+            "calculate risk; review explainability factors; compare scenarios and download reports."
+        ),
+    },
+    {
+        "id": "limitations",
+        "keywords": ["confiable", "limitacion", "decision", "aprobar", "rechazar", "banco", "limitation"],
+        "es": (
+            "El resultado es apoyo analitico y academico. No debe usarse como unica decision para aprobar o rechazar "
+            "creditos; se debe complementar con politicas internas, datos actualizados y revision humana."
+        ),
+        "en": (
+            "The output is analytical and academic support. It should not be the only decision rule for approving or "
+            "rejecting credit; it should be complemented with policies, updated data and human review."
         ),
     },
 ]
@@ -677,11 +726,20 @@ def report_response(content: bytes, filename: str, media_type: str, inline: bool
     )
 
 
-def retrieve_knowledge(message: str, language: str, limit: int = 3) -> List[Dict[str, str]]:
-    text = message.lower()
+def normalize_text(value: Any) -> str:
+    decomposed = unicodedata.normalize("NFKD", str(value or "").lower())
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+
+def has_any(text: str, phrases: List[str]) -> bool:
+    return any(normalize_text(phrase) in text for phrase in phrases)
+
+
+def retrieve_knowledge(message: str, language: str, limit: int = 4) -> List[Dict[str, str]]:
+    text = normalize_text(message)
     scored = []
     for item in ACADEMIC_KNOWLEDGE:
-        score = sum(1 for keyword in item["keywords"] if keyword in text)
+        score = sum(1 for keyword in item["keywords"] if normalize_text(keyword) in text)
         if score:
             scored.append((score, item))
     scored.sort(key=lambda row: row[0], reverse=True)
@@ -727,83 +785,284 @@ def summarize_prediction_context(prediction_context: Optional[Dict[str, Any]], l
     return f"{base} Factores principales: {driver_text}." if driver_text else base
 
 
+def display_model_name(model_name: Optional[str]) -> str:
+    return str(model_name or "LSTM").replace("_", "-")
+
+
+def normalize_model_name(model_name: Optional[str]) -> str:
+    normalized = str(model_name or "LSTM").strip().upper().replace("-", "_").replace(" ", "_")
+    aliases = {"CNNLSTM": "CNN_LSTM", "ATTENTION": "LSTM_ATTENTION", "LSTM_ATT": "LSTM_ATTENTION"}
+    return aliases.get(normalized, normalized)
+
+
+def current_context_model(prediction_context: Optional[Dict[str, Any]]) -> str:
+    if not prediction_context:
+        return "LSTM"
+    for key in ["selected_model", "requested_model", "model_name"]:
+        if prediction_context.get(key):
+            return normalize_model_name(prediction_context.get(key))
+    return "LSTM"
+
+
+def numeric(value: Any) -> Optional[float]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number == number else None
+
+
+def metric(value: Any, digits: int = 3) -> str:
+    number = numeric(value)
+    return "--" if number is None else f"{number:.{digits}f}"
+
+
+def comparison_rows(stats: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [row for row in stats.get("comparison", []) if row.get("model")]
+
+
+def best_row_by_metric(stats: Dict[str, Any], metric_name: str, reverse: bool = True) -> Dict[str, Any]:
+    rows = [row for row in comparison_rows(stats) if numeric(row.get(metric_name)) is not None]
+    if not rows:
+        return {}
+    return sorted(rows, key=lambda row: numeric(row.get(metric_name)) or 0.0, reverse=reverse)[0]
+
+
+def row_for_model(stats: Dict[str, Any], model_name: str) -> Dict[str, Any]:
+    normalized = normalize_model_name(model_name)
+    for row in comparison_rows(stats):
+        if normalize_model_name(row.get("model")) == normalized:
+            return row
+    return {}
+
+
+def availability_for_model(model_name: str) -> Dict[str, Any]:
+    normalized = normalize_model_name(model_name)
+    for model in predictor.available_models():
+        if normalize_model_name(model.get("name")) == normalized:
+            return model
+    return {"name": normalized, "artifact_exists": False, "status": "proxy"}
+
+
+def context_indicator_text(prediction_context: Optional[Dict[str, Any]], language: str) -> str:
+    if not prediction_context:
+        return ""
+    indicators = prediction_context.get("indicators") or {}
+    usage = numeric(indicators.get("usage") or indicators.get("credit_usage"))
+    coverage = numeric(indicators.get("coverage") or indicators.get("payment_coverage"))
+    max_delay = numeric(indicators.get("maxDelay") or indicators.get("max_delay"))
+    parts = []
+    if usage is not None:
+        parts.append(("usage", percent(usage)))
+    if coverage is not None:
+        parts.append(("coverage", percent(coverage)))
+    if max_delay is not None:
+        parts.append(("max delay", f"{max_delay:.0f}"))
+    if not parts:
+        return ""
+    if language == "en":
+        labels = {"usage": "credit usage", "coverage": "payment coverage", "max delay": "maximum delay"}
+        return ", ".join(f"{labels[key]} {value}" for key, value in parts)
+    labels = {"usage": "uso de credito", "coverage": "cobertura de pago", "max delay": "mora maxima"}
+    return ", ".join(f"{labels[key]} {value}" for key, value in parts)
+
+
+def model_recommendation_answer(language: str, stats: Dict[str, Any], prediction_context: Optional[Dict[str, Any]]) -> str:
+    production = normalize_model_name(stats.get("production_model") or "LSTM")
+    selected = current_context_model(prediction_context)
+    auc_row = best_row_by_metric(stats, "roc_auc_mean")
+    f1_row = best_row_by_metric(stats, "f1_mean")
+    speed_row = best_row_by_metric(stats, "fit_seconds_mean", reverse=False)
+    selected_row = row_for_model(stats, selected)
+    selected_availability = availability_for_model(selected)
+
+    if language == "en":
+        artifact_note = (
+            "It has a saved artifact and can be consumed directly by FastAPI."
+            if selected_availability.get("artifact_exists")
+            else "It is currently available as an academic proxy until its trained artifact is saved."
+        )
+        return (
+            f"For the normal app workflow I recommend {display_model_name(production)}, because it is the production model. "
+            f"In the current comparison, the best AUC is {display_model_name(auc_row.get('model'))} "
+            f"with AUC {metric(auc_row.get('roc_auc_mean'))}; the strongest F1 candidate is "
+            f"{display_model_name(f1_row.get('model'))} with F1 {metric(f1_row.get('f1_mean'))}; and the fastest model is "
+            f"{display_model_name(speed_row.get('model'))} with {metric(speed_row.get('fit_seconds_mean'), 2)} seconds. "
+            f"Your selected model is {display_model_name(selected)}: AUC {metric(selected_row.get('roc_auc_mean'))}, "
+            f"F1 {metric(selected_row.get('f1_mean'))}. {artifact_note} "
+            "For a teacher presentation, show all five models, but use the production model for the final prediction and reports."
+        )
+    artifact_note = (
+        "Tiene artefacto guardado y FastAPI lo puede consumir directamente."
+        if selected_availability.get("artifact_exists")
+        else "Por ahora funciona como proxy academico hasta guardar su artefacto entrenado."
+    )
+    return (
+        f"Para el flujo normal de la app recomiendo {display_model_name(production)}, porque es el modelo en produccion. "
+        f"En la comparacion actual, el mejor AUC es {display_model_name(auc_row.get('model'))} "
+        f"con AUC {metric(auc_row.get('roc_auc_mean'))}; el mejor candidato por F1 es "
+        f"{display_model_name(f1_row.get('model'))} con F1 {metric(f1_row.get('f1_mean'))}; y el mas rapido es "
+        f"{display_model_name(speed_row.get('model'))} con {metric(speed_row.get('fit_seconds_mean'), 2)} segundos. "
+        f"Tu modelo seleccionado es {display_model_name(selected)}: AUC {metric(selected_row.get('roc_auc_mean'))}, "
+        f"F1 {metric(selected_row.get('f1_mean'))}. {artifact_note} "
+        "Para exponer ante tu docente, muestra los cinco modelos, pero usa el modelo en produccion para la prediccion final y los reportes."
+    )
+
+
+def purpose_answer(language: str) -> str:
+    if language == "en":
+        return (
+            "This web app is an AI financial advisor for academic and demo use. It estimates the probability of credit default "
+            "from a client's profile, credit limit, six months of balances, payments and delay history. It also compares neural "
+            "models, explains the main risk drivers, lets users simulate scenarios and generates PDF, Word and Excel reports."
+        )
+    return (
+        "Esta app web es un asesor financiero con IA para uso academico y demostrativo. Estima la probabilidad de incumplimiento "
+        "crediticio usando perfil del cliente, limite de credito, seis meses de saldos, pagos e historial de mora. Tambien compara "
+        "modelos neuronales, explica los factores principales del riesgo, permite simular escenarios y genera reportes PDF, Word y Excel."
+    )
+
+
+def workflow_answer(language: str) -> str:
+    if language == "en":
+        return (
+            "Use it in this order: 1. enter the client profile, 2. add delay history, balances and payments, 3. choose the model, "
+            "4. calculate risk, 5. review the gauge and explanatory factors, 6. compare scenarios if needed, and 7. preview or download reports."
+        )
+    return (
+        "Usala en este orden: 1. ingresa el perfil del cliente, 2. completa mora, saldos y pagos, 3. elige el modelo, "
+        "4. calcula el riesgo, 5. revisa el medidor y los factores explicativos, 6. compara escenarios si lo necesitas, "
+        "y 7. previsualiza o descarga los reportes."
+    )
+
+
+def risk_answer(language: str, prediction_context: Optional[Dict[str, Any]]) -> str:
+    context_summary = summarize_prediction_context(prediction_context, language)
+    if not context_summary:
+        if language == "en":
+            return (
+                "The risk score uses payment delays, payment coverage, credit usage, approved limit and profile variables. "
+                "Calculate a profile first and then ask me 'why did I get this risk?' for a personalized explanation."
+            )
+        return (
+            "El riesgo usa mora, cobertura de pagos, uso del credito, limite aprobado y variables del perfil. "
+            "Primero calcula un perfil y luego preguntame 'por que me dio este riesgo?' para darte una explicacion personalizada."
+        )
+
+    probability = numeric(prediction_context.get("probability")) or 0.0
+    indicators = context_indicator_text(prediction_context, language)
+    drivers = prediction_context.get("drivers") or []
+    driver_text = "; ".join(
+        (driver.get("detail") or driver.get("factor") or "").rstrip(". ")
+        for driver in drivers[:3]
+        if driver
+    )
+    if language == "en":
+        action = (
+            "This is a high-risk profile: review delays, reduce credit usage and require stronger payment evidence."
+            if probability >= 0.70
+            else "This is a medium-risk profile: monitor payment coverage and test an optimized scenario."
+            if probability >= 0.40
+            else "This is a low-risk profile: the profile looks healthier, but still review the explanatory factors."
+        )
+        return f"{context_summary} Indicators: {indicators or 'not available'}. {action} Main explanation: {driver_text or 'no strong factor detected'}."
+    action = (
+        "Es un perfil de riesgo alto: revisa mora, reduce uso del credito y exige mayor evidencia de pago."
+        if probability >= 0.70
+        else "Es un perfil de riesgo medio: monitorea cobertura de pagos y prueba un escenario optimizado."
+        if probability >= 0.40
+        else "Es un perfil de riesgo bajo: el perfil luce mas saludable, pero igual conviene revisar los factores explicativos."
+    )
+    return f"{context_summary} Indicadores: {indicators or 'no disponibles'}. {action} Explicacion principal: {driver_text or 'no se detecto un factor fuerte'}."
+
+
+def statistics_answer(language: str, stats: Dict[str, Any]) -> str:
+    tests = stats.get("statistical_tests", [])
+    folds = stats.get("required_structure", {}).get("cross_validation_folds", 0)
+    auc_row = best_row_by_metric(stats, "roc_auc_mean")
+    if language == "en":
+        return (
+            f"The statistical module validates model comparison with {folds or 5} cross-validation folds, paired t-test and Wilcoxon. "
+            f"It currently reads {len(tests)} paired comparisons. The leading AUC model is "
+            f"{display_model_name(auc_row.get('model'))} with AUC {metric(auc_row.get('roc_auc_mean'))}. "
+            "Use this section to justify whether differences between models are robust or only descriptive."
+        )
+    return (
+        f"El modulo estadistico valida la comparacion con {folds or 5} folds de validacion cruzada, t-test pareado y Wilcoxon. "
+        f"Actualmente lee {len(tests)} comparaciones pareadas. El modelo lider por AUC es "
+        f"{display_model_name(auc_row.get('model'))} con AUC {metric(auc_row.get('roc_auc_mean'))}. "
+        "Usa esta seccion para justificar si las diferencias entre modelos son robustas o solo descriptivas."
+    )
+
+
+def reports_answer(language: str) -> str:
+    if language == "en":
+        return (
+            "The reports belong to the program output, not only to the deliverables. PDF is useful for preview and presentation, "
+            "Word for editable academic documentation, and Excel for reviewing the entered data, metrics and charts."
+        )
+    return (
+        "Los reportes son salidas del programa, no solo entregables. El PDF sirve para previsualizar y presentar, "
+        "Word para documentacion academica editable, y Excel para revisar datos ingresados, metricas y graficos."
+    )
+
+
+def example_questions_answer(language: str) -> str:
+    if language == "en":
+        return (
+            "Useful questions are: What does this app do? Which model should I use? Why did this profile get this risk? "
+            "What do AUC and F1 mean? How do the statistical tests validate the models? What report should I download?"
+        )
+    return (
+        "Preguntas utiles que puedes hacer: Para que sirve esta app? Que modelo debo usar? Por que este perfil dio ese riesgo? "
+        "Que significan AUC y F1? Como validan los modelos las pruebas estadisticas? Que reporte debo descargar?"
+    )
+
+
 def chatbot_answer(message: str, language: str, prediction_context: Optional[Dict[str, Any]] = None) -> Dict:
-    text = message.lower()
+    text = normalize_text(message)
     stats = statistical_validation_summary()
     topics: List[str] = []
     retrieved = retrieve_knowledge(message, language)
-    context_summary = summarize_prediction_context(prediction_context, language)
-    context_used = bool(context_summary)
+    context_used = bool(prediction_context and prediction_context.get("probability") is not None)
 
-    asks_current_risk = any(word in text for word in ["porque", "por que", "why", "18", "riesgo", "risk", "resultado"])
+    asks_purpose = has_any(text, ["para que", "que hace", "sirve", "programa", "app", "aplicacion", "proyecto"])
+    asks_workflow = has_any(text, ["como uso", "como funciona", "pasos", "llenar", "usuario", "usar la app"])
+    asks_model = has_any(text, ["modelo", "model", "lstm", "gru", "mlp", "cnn", "attention", "atencion", "debo usar", "recomienda"])
+    asks_statistics = has_any(text, ["estadistica", "estadistico", "wilcoxon", "t-test", "ttest", "cross", "fold", "validacion", "prueba"])
+    asks_reports = has_any(text, ["reporte", "report", "pdf", "word", "excel", "descargar", "previsualizar"])
+    asks_risk = has_any(text, ["porque", "por que", "why", "riesgo", "risk", "resultado", "mora", "pago", "saldo", "incumplimiento"])
+    asks_examples = has_any(text, ["preguntas", "usuarios", "que puedo preguntar", "ejemplos", "faq"])
 
-    if context_summary and asks_current_risk:
-        topics.append("dynamic_context")
-        if language == "en":
-            answer = (
-                f"{context_summary} This means the assistant is reading the last simulated profile, not only a generic rule. "
-                "Operational XAI uses the payment delays, payment coverage, credit usage and approved limit to explain the neural result."
-            )
-        else:
-            answer = (
-                f"{context_summary} Esto significa que el asistente esta leyendo la ultima simulacion, no solo una regla generica. "
-                "La XAI operativa usa mora, cobertura de pagos, uso del credito y limite aprobado para explicar la salida neuronal."
-            )
-    elif any(word in text for word in ["modelo", "model", "lstm", "red", "neural"]):
-        topics.append("models")
-        if language == "en":
-            answer = (
-                "The program uses LSTM in production because it was selected as the best saved model "
-                "after comparing 3 classic neural models (MLP, LSTM, GRU) and 2 hybrid models "
-                "(CNN-LSTM and LSTM-Attention). The selection criterion is mainly cross-validation AUC-ROC."
-            )
-        else:
-            answer = (
-                "El programa usa LSTM en produccion porque fue seleccionado como el mejor modelo guardado "
-                "tras comparar 3 modelos clasicos de redes neuronales (MLP, LSTM, GRU) y 2 modelos hibridos "
-                "(CNN-LSTM y LSTM-Attention). El criterio principal es AUC-ROC en validacion cruzada."
-            )
-    elif any(word in text for word in ["estad", "stat", "wilcoxon", "t-test", "valid"]):
+    if asks_examples:
+        topics.append("examples")
+        answer = example_questions_answer(language)
+    elif asks_statistics:
         topics.append("statistics")
-        tests = stats.get("statistical_tests", [])
-        if language == "en":
-            answer = (
-                f"The statistical validation module reads {len(tests)} paired comparisons. "
-                "It uses paired t-test and Wilcoxon over fold AUC values to verify whether model differences "
-                "are robust at the 5% significance level."
-            )
-        else:
-            answer = (
-                f"El modulo de pruebas estadisticas lee {len(tests)} comparaciones pareadas. "
-                "Usa t-test pareado y Wilcoxon sobre el AUC por fold para validar si las diferencias "
-                "entre modelos son robustas al 5% de significancia."
-            )
-    elif any(word in text for word in ["reporte", "report", "pdf", "word", "excel"]):
-        topics.append("reports")
-        answer = (
-            "You can generate PDF, Word and Excel reports from the current financial form. "
-            "The PDF can be previewed on screen before download."
-            if language == "en"
-            else "Puedes generar reportes PDF, Word y Excel con los datos financieros actuales del formulario. "
-            "El PDF se puede previsualizar en pantalla antes de descargarlo."
-        )
-    elif any(word in text for word in ["riesgo", "risk", "mora", "pago", "saldo"]):
+        answer = statistics_answer(language, stats)
+    elif asks_model:
+        topics.append("model_recommendation")
+        answer = model_recommendation_answer(language, stats, prediction_context)
+    elif asks_risk:
         topics.append("risk")
-        answer = (
-            "The risk score combines the trained neural model with the user's credit limit, payment delays, "
-            "billed balances and payments. Higher late payments and low payment coverage increase risk."
-            if language == "en"
-            else "El riesgo combina el modelo neuronal entrenado con limite de credito, mora, saldos facturados "
-            "y pagos realizados. Mayor mora y baja cobertura de pago elevan el riesgo."
-        )
+        answer = risk_answer(language, prediction_context)
+    elif asks_reports:
+        topics.append("reports")
+        answer = reports_answer(language)
+    elif asks_workflow:
+        topics.append("workflow")
+        answer = workflow_answer(language)
+    elif asks_purpose:
+        topics.append("purpose")
+        answer = purpose_answer(language)
     else:
         topics.append("help")
         answer = (
-            "I can help with the selected neural model, reports, statistical validation, risk interpretation, "
-            "and the Render/Vercel deployment."
+            "I can answer about the app purpose, model choice, risk explanation, reports, statistical validation and deployment. "
+            "Ask for example: 'Which model should I use?' or 'Why did this profile get this risk?'"
             if language == "en"
-            else "Puedo ayudarte con el modelo neuronal seleccionado, reportes, validacion estadistica, "
-            "interpretacion del riesgo y despliegue en Render/Vercel."
+            else "Puedo responder sobre el proposito de la app, eleccion de modelos, explicacion del riesgo, reportes, validacion estadistica y despliegue. "
+            "Por ejemplo: 'Que modelo debo usar?' o 'Por que este perfil dio este riesgo?'"
         )
 
     if retrieved:

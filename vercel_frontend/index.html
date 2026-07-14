@@ -361,6 +361,12 @@
         <div class="chat-box" id="chat-messages" aria-live="polite">
           <div class="chat-message bot" data-i18n="chat_welcome">Hola, puedo explicar el modelo LSTM, los 5 modelos entrenados, reportes y pruebas estadisticas.</div>
         </div>
+        <div class="chat-prompts" aria-label="Preguntas rapidas">
+          <button type="button" data-chat-prompt-key="chat_prompt_purpose_full" data-i18n="chat_prompt_purpose">Para que sirve?</button>
+          <button type="button" data-chat-prompt-key="chat_prompt_model_full" data-i18n="chat_prompt_model">Que modelo uso?</button>
+          <button type="button" data-chat-prompt-key="chat_prompt_risk_full" data-i18n="chat_prompt_risk">Explica mi riesgo</button>
+          <button type="button" data-chat-prompt-key="chat_prompt_reports_full" data-i18n="chat_prompt_reports">Reportes</button>
+        </div>
         <form class="chat-form" id="chat-form">
           <input id="chat-input" type="text" maxlength="600" data-i18n-placeholder="chat_placeholder" placeholder="Pregunta sobre modelos, reportes o riesgo" />
           <button class="primary-link" type="submit" data-i18n="send">Enviar</button>

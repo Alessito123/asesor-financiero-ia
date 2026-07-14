@@ -1412,6 +1412,7 @@ select.is-valid {
   color: var(--ink);
   font-size: 14px;
   line-height: 1.5;
+  white-space: pre-line;
 }
 
 .chat-message.bot {
@@ -1423,6 +1424,32 @@ select.is-valid {
   justify-self: end;
   border-color: var(--teal-border);
   background: var(--teal-soft-2);
+}
+
+.chat-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chat-prompts button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 8px 11px;
+  font-size: 12px;
+  font-weight: 850;
+  transition: transform var(--transition), border-color var(--transition), background var(--transition), color var(--transition);
+}
+
+.chat-prompts button:hover {
+  border-color: var(--teal-border);
+  background: var(--accent-soft);
+  color: var(--ink);
+  transform: translateY(-1px);
 }
 
 .chat-form {
