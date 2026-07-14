@@ -29,8 +29,354 @@ const reportPreview = document.querySelector("#program-report-preview");
 const reportFrame = document.querySelector("#program-report-frame");
 const reportStatus = document.querySelector("#report-status");
 const reportButtons = document.querySelectorAll("[data-report-format]");
+const languageToggle = document.querySelector("#language-toggle");
+const themeToggle = document.querySelector("#theme-toggle");
+const refreshStatsButton = document.querySelector("#refresh-stats-button");
+const productionModel = document.querySelector("#production-model");
+const modelGrid = document.querySelector("#model-grid");
+const statsTableBody = document.querySelector("#stats-table-body");
+const chatForm = document.querySelector("#chat-form");
+const chatInput = document.querySelector("#chat-input");
+const chatMessages = document.querySelector("#chat-messages");
 
+let currentLanguage = localStorage.getItem("afi_language") || "es";
+let currentTheme = localStorage.getItem("afi_theme") || "light";
 let reportPreviewUrl = null;
+let latestStats = null;
+let lastPrediction = null;
+let isSubmitting = false;
+let statusState = { state: null, key: "api_connecting", params: {} };
+let reportState = { key: "report_ready", isError: false, params: {} };
+
+const translations = {
+  es: {
+    brand_subtitle: "Riesgo crediticio personal",
+    api_connecting: "Conectando API",
+    api_ok: "API {status} | {mode}",
+    api_unavailable: "API no disponible",
+    nav_models: "Modelos",
+    nav_reports: "Reportes",
+    nav_chat: "Chatbot",
+    theme_dark: "Oscuro",
+    theme_light: "Claro",
+    overview_eyebrow: "FastAPI + IA financiera",
+    page_title: "Evalua el riesgo de incumplimiento con datos de credito.",
+    metric_backend: "Backend",
+    metric_frontend: "Frontend",
+    simulator_eyebrow: "Simulador",
+    client_profile: "Perfil del cliente",
+    reset: "Restablecer",
+    currency_note: "Todos los montos monetarios se ingresan en soles peruanos (S/).",
+    scenario_current: "Perfil actual",
+    scenario_healthy: "Cliente estable",
+    scenario_alert: "Mora elevada",
+    personal_data: "Datos personales",
+    payment_history: "Historial de pago",
+    billed_balances: "Saldos facturados en S/",
+    payments_done: "Pagos realizados en S/",
+    calculate_risk: "Calcular riesgo",
+    calculating: "Calculando...",
+    result_eyebrow: "Resultado",
+    model_reading: "Lectura del modelo",
+    no_calculation: "Sin calculo",
+    waiting_data: "Esperando datos",
+    waiting_copy: "Completa el perfil y ejecuta la prediccion.",
+    model_explanation_pending: "La explicacion del modelo aparecera aqui despues de calcular.",
+    avg_usage: "Uso promedio",
+    coverage: "Pago / saldo",
+    max_delay: "Mora maxima",
+    no_delay: "Sin mora",
+    month: "mes",
+    months: "meses",
+    balances_vs_payments: "Saldos vs pagos",
+    risk_low: "Riesgo bajo",
+    risk_medium: "Riesgo medio",
+    risk_high: "Riesgo alto",
+    risk_low_copy: "Perfil con menor riesgo relativo segun los datos ingresados.",
+    risk_medium_copy: "Perfil intermedio con senales que requieren seguimiento.",
+    risk_high_copy: "Conviene revisar mora y capacidad de pago antes de aprobar.",
+    prediction: "Prediccion",
+    probable_default: "incumplimiento probable",
+    no_probable_default: "sin incumplimiento probable",
+    with_threshold: "con umbral",
+    processing_profile: "Procesando perfil financiero...",
+    no_connection: "Sin conexion",
+    render_connection_error: "No se pudo consultar la API de Render.",
+    check_backend: "Revisa que el backend de Render este activo y vuelve a intentar.",
+    models_eyebrow: "Validacion IA",
+    models_title: "Modelos neuronales y pruebas estadisticas",
+    refresh_stats: "Actualizar pruebas",
+    production_model: "Modelo en produccion",
+    classic_models: "Modelos clasicos",
+    hybrid_models: "Modelos hibridos",
+    table_model: "Modelo",
+    table_time: "Tiempo",
+    table_validation: "Validacion",
+    stats_loading: "Cargando pruebas estadisticas...",
+    stats_error: "No se pudo cargar la validacion estadistica.",
+    selected_model: "Modelo seleccionado como mejor resultado.",
+    no_interpretation: "Sin comparacion estadistica disponible.",
+    model_type_classic: "Clasico",
+    model_type_hybrid: "Hibrido",
+    auc_label: "AUC",
+    f1_label: "F1",
+    process_time: "Tiempo de proceso",
+    significant_both: "Diferencia significativa en t-test y Wilcoxon.",
+    significant_t: "Diferencia significativa en t-test pareado.",
+    significant_w: "Diferencia significativa en Wilcoxon.",
+    not_significant: "Sin evidencia robusta al 5%.",
+    program_eyebrow: "Programa",
+    financial_report_title: "Reporte del analisis financiero",
+    preview_pdf: "Previsualizar PDF",
+    preview: "Vista previa",
+    financial_report: "Reporte financiero",
+    no_report: "Sin reporte generado",
+    no_report_hint: "Calcula el riesgo o previsualiza el PDF con los datos actuales.",
+    pdf_report_desc: "Resultado, indicadores y recomendaciones.",
+    editable_report: "Reporte editable",
+    docx_report_desc: "Word generado desde la prediccion actual.",
+    analysis_table: "Tabla del analisis",
+    xlsx_report_desc: "Excel con resultado, indicadores y variables.",
+    report_ready: "Listo para generar con los datos del formulario.",
+    report_generating_preview: "Generando vista previa del reporte...",
+    report_preparing_download: "Preparando descarga...",
+    report_preview_ready: "Vista previa generada con los datos actuales.",
+    report_downloaded: "Reporte descargado con los datos actuales.",
+    report_error: "No se pudo generar el reporte. Revisa la conexion con Render.",
+    report_stale: "Datos modificados. Genera nuevamente el reporte para actualizarlo.",
+    academic_docs: "Documentos academicos del proyecto",
+    chat_eyebrow: "Asistente",
+    chat_title: "Chatbot del asesor financiero",
+    chat_mode: "Soporte academico",
+    chat_welcome: "Hola, puedo explicar el modelo LSTM, los 5 modelos entrenados, reportes y pruebas estadisticas.",
+    chat_placeholder: "Pregunta sobre modelos, reportes o riesgo",
+    chat_error: "No pude responder ahora. Revisa la conexion con Render.",
+    chat_typing: "Consultando al asistente...",
+    send: "Enviar",
+  },
+  en: {
+    brand_subtitle: "Personal credit risk",
+    api_connecting: "Connecting API",
+    api_ok: "API {status} | {mode}",
+    api_unavailable: "API unavailable",
+    nav_models: "Models",
+    nav_reports: "Reports",
+    nav_chat: "Chatbot",
+    theme_dark: "Dark",
+    theme_light: "Light",
+    overview_eyebrow: "FastAPI + financial AI",
+    page_title: "Evaluate default risk with credit profile data.",
+    metric_backend: "Backend",
+    metric_frontend: "Frontend",
+    simulator_eyebrow: "Simulator",
+    client_profile: "Client profile",
+    reset: "Reset",
+    currency_note: "All monetary values are entered in Peruvian soles (S/).",
+    scenario_current: "Current profile",
+    scenario_healthy: "Stable client",
+    scenario_alert: "High delay",
+    personal_data: "Personal data",
+    payment_history: "Payment history",
+    billed_balances: "Billed balances in S/",
+    payments_done: "Payments made in S/",
+    calculate_risk: "Calculate risk",
+    calculating: "Calculating...",
+    result_eyebrow: "Result",
+    model_reading: "Model reading",
+    no_calculation: "No calculation",
+    waiting_data: "Waiting for data",
+    waiting_copy: "Complete the profile and run the prediction.",
+    model_explanation_pending: "The model explanation will appear here after calculation.",
+    avg_usage: "Average usage",
+    coverage: "Payment / balance",
+    max_delay: "Max delay",
+    no_delay: "No delay",
+    month: "month",
+    months: "months",
+    balances_vs_payments: "Balances vs payments",
+    risk_low: "Low risk",
+    risk_medium: "Medium risk",
+    risk_high: "High risk",
+    risk_low_copy: "Lower relative risk profile based on the entered data.",
+    risk_medium_copy: "Intermediate profile with signals that need monitoring.",
+    risk_high_copy: "Review payment capacity and late payments before approval.",
+    prediction: "Prediction",
+    probable_default: "probable default",
+    no_probable_default: "no probable default",
+    with_threshold: "with threshold",
+    processing_profile: "Processing financial profile...",
+    no_connection: "No connection",
+    render_connection_error: "Could not query the Render API.",
+    check_backend: "Check that the Render backend is active and try again.",
+    models_eyebrow: "AI validation",
+    models_title: "Neural models and statistical tests",
+    refresh_stats: "Refresh tests",
+    production_model: "Production model",
+    classic_models: "Classic models",
+    hybrid_models: "Hybrid models",
+    table_model: "Model",
+    table_time: "Time",
+    table_validation: "Validation",
+    stats_loading: "Loading statistical tests...",
+    stats_error: "Could not load statistical validation.",
+    selected_model: "Selected as the best model.",
+    no_interpretation: "No statistical comparison available.",
+    model_type_classic: "Classic",
+    model_type_hybrid: "Hybrid",
+    auc_label: "AUC",
+    f1_label: "F1",
+    process_time: "Process time",
+    significant_both: "Significant difference in t-test and Wilcoxon.",
+    significant_t: "Significant difference in paired t-test.",
+    significant_w: "Significant difference in Wilcoxon.",
+    not_significant: "No robust evidence at 5%.",
+    program_eyebrow: "Program",
+    financial_report_title: "Financial analysis report",
+    preview_pdf: "Preview PDF",
+    preview: "Preview",
+    financial_report: "Financial report",
+    no_report: "No report generated",
+    no_report_hint: "Calculate risk or preview the PDF with the current data.",
+    pdf_report_desc: "Result, indicators and recommendations.",
+    editable_report: "Editable report",
+    docx_report_desc: "Word generated from the current prediction.",
+    analysis_table: "Analysis table",
+    xlsx_report_desc: "Excel with result, indicators and variables.",
+    report_ready: "Ready to generate with the form data.",
+    report_generating_preview: "Generating report preview...",
+    report_preparing_download: "Preparing download...",
+    report_preview_ready: "Preview generated with current data.",
+    report_downloaded: "Report downloaded with current data.",
+    report_error: "Could not generate the report. Check the Render connection.",
+    report_stale: "Data changed. Generate the report again to update it.",
+    academic_docs: "Academic project documents",
+    chat_eyebrow: "Assistant",
+    chat_title: "Financial advisor chatbot",
+    chat_mode: "Academic support",
+    chat_welcome: "Hi, I can explain the LSTM model, the 5 trained models, reports and statistical tests.",
+    chat_placeholder: "Ask about models, reports or risk",
+    chat_error: "I could not answer now. Check the Render connection.",
+    chat_typing: "Asking the assistant...",
+    send: "Send",
+  },
+};
+
+const fieldLanguage = {
+  es: {
+    labels: {
+      LIMIT_BAL: "Credito concedido",
+      AGE: "Edad",
+      SEX: "Sexo",
+      EDUCATION: "Educacion",
+      MARRIAGE: "Estado civil",
+      PAY_0: "Mes actual",
+      PAY_2: "Mes -2",
+      PAY_3: "Mes -3",
+      PAY_4: "Mes -4",
+      PAY_5: "Mes -5",
+      PAY_6: "Mes -6",
+      BILL_AMT1: "Saldo 1",
+      BILL_AMT2: "Saldo 2",
+      BILL_AMT3: "Saldo 3",
+      BILL_AMT4: "Saldo 4",
+      BILL_AMT5: "Saldo 5",
+      BILL_AMT6: "Saldo 6",
+      PAY_AMT1: "Pago 1",
+      PAY_AMT2: "Pago 2",
+      PAY_AMT3: "Pago 3",
+      PAY_AMT4: "Pago 4",
+      PAY_AMT5: "Pago 5",
+      PAY_AMT6: "Pago 6",
+    },
+    hints: {
+      LIMIT_BAL: "Monto en soles (S/)",
+      AGE: "18 a 100",
+      PAY_0: "-2 a 9",
+      PAY_2: "-2 a 9",
+      PAY_3: "-2 a 9",
+      PAY_4: "-2 a 9",
+      PAY_5: "-2 a 9",
+      PAY_6: "-2 a 9",
+      BILL_AMT1: "S/",
+      BILL_AMT2: "S/",
+      BILL_AMT3: "S/",
+      BILL_AMT4: "S/",
+      BILL_AMT5: "S/",
+      BILL_AMT6: "S/",
+      PAY_AMT1: "S/",
+      PAY_AMT2: "S/",
+      PAY_AMT3: "S/",
+      PAY_AMT4: "S/",
+      PAY_AMT5: "S/",
+      PAY_AMT6: "S/",
+    },
+    options: {
+      SEX: { 1: "Masculino", 2: "Femenino" },
+      EDUCATION: { 1: "Posgrado", 2: "Universidad", 3: "Secundaria", 4: "Otros" },
+      MARRIAGE: { 1: "Casado", 2: "Soltero", 3: "Otros" },
+    },
+  },
+  en: {
+    labels: {
+      LIMIT_BAL: "Granted credit",
+      AGE: "Age",
+      SEX: "Sex",
+      EDUCATION: "Education",
+      MARRIAGE: "Marital status",
+      PAY_0: "Current month",
+      PAY_2: "Month -2",
+      PAY_3: "Month -3",
+      PAY_4: "Month -4",
+      PAY_5: "Month -5",
+      PAY_6: "Month -6",
+      BILL_AMT1: "Balance 1",
+      BILL_AMT2: "Balance 2",
+      BILL_AMT3: "Balance 3",
+      BILL_AMT4: "Balance 4",
+      BILL_AMT5: "Balance 5",
+      BILL_AMT6: "Balance 6",
+      PAY_AMT1: "Payment 1",
+      PAY_AMT2: "Payment 2",
+      PAY_AMT3: "Payment 3",
+      PAY_AMT4: "Payment 4",
+      PAY_AMT5: "Payment 5",
+      PAY_AMT6: "Payment 6",
+    },
+    hints: {
+      LIMIT_BAL: "Amount in soles (S/)",
+      AGE: "18 to 100",
+      PAY_0: "-2 to 9",
+      PAY_2: "-2 to 9",
+      PAY_3: "-2 to 9",
+      PAY_4: "-2 to 9",
+      PAY_5: "-2 to 9",
+      PAY_6: "-2 to 9",
+      BILL_AMT1: "S/",
+      BILL_AMT2: "S/",
+      BILL_AMT3: "S/",
+      BILL_AMT4: "S/",
+      BILL_AMT5: "S/",
+      BILL_AMT6: "S/",
+      PAY_AMT1: "S/",
+      PAY_AMT2: "S/",
+      PAY_AMT3: "S/",
+      PAY_AMT4: "S/",
+      PAY_AMT5: "S/",
+      PAY_AMT6: "S/",
+    },
+    options: {
+      SEX: { 1: "Male", 2: "Female" },
+      EDUCATION: { 1: "Graduate", 2: "University", 3: "High school", 4: "Other" },
+      MARRIAGE: { 1: "Married", 2: "Single", 3: "Other" },
+    },
+  },
+};
+
+const explanationTranslations = {
+  "Existe historial de pago atrasado en al menos un mes.": "There is late payment history in at least one month.",
+  "La utilizacion promedio del credito es elevada.": "Average credit utilization is high.",
+  "El perfil se ubica en zona de menor riesgo relativo.": "The profile is in a lower relative risk zone.",
+};
 
 const baseSample = {
   LIMIT_BAL: 200000,
@@ -187,16 +533,27 @@ const fieldGroups = {
   })),
 };
 
+function t(key, params = {}) {
+  const template = translations[currentLanguage][key] || translations.es[key] || key;
+  return Object.entries(params).reduce(
+    (text, [name, value]) => text.replaceAll(`{${name}}`, value),
+    template,
+  );
+}
+
 function formatMoney(value) {
-  return new Intl.NumberFormat("es-PE", {
-    style: "currency",
-    currency: "PEN",
-    maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+  const locale = currentLanguage === "en" ? "en-US" : "es-PE";
+  return `S/ ${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(value) || 0)}`;
 }
 
 function formatPercent(value) {
   return `${Math.round((Number(value) || 0) * 100)}%`;
+}
+
+function formatDecimal(value, digits = 3) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "--";
+  return number.toFixed(digits);
 }
 
 function reportFilename(format) {
@@ -204,9 +561,60 @@ function reportFilename(format) {
   return `reporte_financiero_programa_${stamp}.${format}`;
 }
 
+function applyTheme() {
+  document.documentElement.dataset.theme = currentTheme;
+  themeToggle.textContent = t(currentTheme === "dark" ? "theme_light" : "theme_dark");
+}
+
+function applyFieldLanguage() {
+  const language = fieldLanguage[currentLanguage];
+  document.querySelectorAll("[data-field-label]").forEach((label) => {
+    const fieldName = label.dataset.fieldLabel;
+    label.textContent = language.labels[fieldName] || label.textContent;
+  });
+  document.querySelectorAll("[data-field-hint]").forEach((hint) => {
+    const fieldName = hint.dataset.fieldHint;
+    hint.textContent = language.hints[fieldName] || hint.textContent;
+  });
+  document.querySelectorAll("[data-field-option]").forEach((option) => {
+    const [fieldName, optionValue] = option.dataset.fieldOption.split(":");
+    option.textContent = language.options[fieldName]?.[optionValue] || option.textContent;
+  });
+}
+
+function applyLanguage() {
+  document.documentElement.lang = currentLanguage;
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    element.textContent = t(element.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+    element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
+  });
+  languageToggle.textContent = currentLanguage === "es" ? "EN" : "ES";
+  applyTheme();
+  applyFieldLanguage();
+  setStatus(statusState.state, t(statusState.key, statusState.params));
+  setReportStatus(t(reportState.key, reportState.params), reportState.isError);
+  updateSnapshot();
+  renderRiskState();
+  renderStatistics();
+  if (!lastPrediction) {
+    modelMode.textContent = t("no_calculation");
+    riskLabel.textContent = t("waiting_data");
+    riskCopy.textContent = t("waiting_copy");
+    resultNotes.innerHTML = `<p>${t("model_explanation_pending")}</p>`;
+  }
+  if (!isSubmitting) submitButton.textContent = t("calculate_risk");
+}
+
 function setReportStatus(message, isError = false) {
   reportStatus.textContent = message;
   reportStatus.classList.toggle("is-error", isError);
+}
+
+function setReportStatusKey(key, isError = false, params = {}) {
+  reportState = { key, isError, params };
+  setReportStatus(t(key, params), isError);
 }
 
 function setReportButtonsLoading(isLoading) {
@@ -214,6 +622,17 @@ function setReportButtonsLoading(isLoading) {
   reportButtons.forEach((button) => {
     button.disabled = isLoading;
   });
+}
+
+function setStatus(state, message) {
+  statusBox.classList.remove("is-ok", "is-error");
+  if (state) statusBox.classList.add(state);
+  statusBox.querySelector("span:last-child").textContent = message;
+}
+
+function setStatusKey(state, key, params = {}) {
+  statusState = { state, key, params };
+  setStatus(state, t(key, params));
 }
 
 function downloadBlob(blob, filename) {
@@ -229,7 +648,7 @@ function downloadBlob(blob, filename) {
 
 async function fetchProgramReport(format, { preview = false } = {}) {
   setReportButtonsLoading(true);
-  setReportStatus(preview ? "Generando vista previa del reporte..." : "Preparando descarga...");
+  setReportStatusKey(preview ? "report_generating_preview" : "report_preparing_download");
 
   try {
     const response = await fetch(`${backendUrl}/reports/financial/${format}`, {
@@ -246,13 +665,13 @@ async function fetchProgramReport(format, { preview = false } = {}) {
       reportPreviewUrl = URL.createObjectURL(blob);
       reportFrame.src = reportPreviewUrl;
       reportPreview.classList.add("has-document");
-      setReportStatus("Vista previa generada con los datos actuales.");
+      setReportStatusKey("report_preview_ready");
     } else {
       downloadBlob(blob, reportFilename(format));
-      setReportStatus("Reporte descargado con los datos actuales.");
+      setReportStatusKey("report_downloaded");
     }
   } catch {
-    setReportStatus("No se pudo generar el reporte. Revisa la conexion con Render.", true);
+    setReportStatusKey("report_error", true);
   } finally {
     setReportButtonsLoading(false);
   }
@@ -265,6 +684,7 @@ function createField(config) {
 
   const label = document.createElement("label");
   label.setAttribute("for", config.name);
+  label.dataset.fieldLabel = config.name;
   label.textContent = config.label;
 
   const control =
@@ -276,6 +696,7 @@ function createField(config) {
     for (const [value, text] of config.options) {
       const option = document.createElement("option");
       option.value = value;
+      option.dataset.fieldOption = `${config.name}:${value}`;
       option.textContent = text;
       control.appendChild(option);
     }
@@ -291,6 +712,7 @@ function createField(config) {
 
   if (config.hint) {
     const hint = document.createElement("span");
+    hint.dataset.fieldHint = config.name;
     hint.textContent = config.hint;
     field.appendChild(hint);
   }
@@ -382,18 +804,28 @@ function updateSnapshot() {
   usageValue.textContent = formatPercent(Math.min(derived.usage, 1));
   coverageValue.textContent = formatPercent(derived.coverage);
   delayValue.textContent =
-    derived.maxDelay > 0 ? `${derived.maxDelay} ${derived.maxDelay === 1 ? "mes" : "meses"}` : "Sin mora";
+    derived.maxDelay > 0
+      ? `${derived.maxDelay} ${derived.maxDelay === 1 ? t("month") : t("months")}`
+      : t("no_delay");
   flowTotal.textContent = `${formatMoney(derived.totalBills)} / ${formatMoney(derived.totalPayments)}`;
   drawFlowChart(payload);
 }
 
-function setStatus(state, message) {
-  statusBox.classList.remove("is-ok", "is-error");
-  if (state) statusBox.classList.add(state);
-  statusBox.querySelector("span:last-child").textContent = message;
+function riskLabelKey(probability) {
+  if (probability >= 0.7) return "risk_high";
+  if (probability >= 0.4) return "risk_medium";
+  return "risk_low";
 }
 
-function setRiskState(probability, label, data) {
+function riskCopyKey(probability) {
+  if (probability >= 0.7) return "risk_high_copy";
+  if (probability >= 0.4) return "risk_medium_copy";
+  return "risk_low_copy";
+}
+
+function renderRiskState() {
+  if (!lastPrediction) return;
+  const { probability, data } = lastPrediction;
   const percent = Math.round(probability * 100);
   const riskClass =
     probability >= 0.7 ? "risk-high" : probability >= 0.4 ? "risk-medium" : "risk-low";
@@ -402,22 +834,25 @@ function setRiskState(probability, label, data) {
   riskMeter.classList.add(riskClass);
   riskMeter.style.setProperty("--risk-angle", `${Math.min(360, probability * 360)}deg`);
   gaugeValue.textContent = `${percent}%`;
-  riskLabel.textContent = `Riesgo ${label}`;
-  riskCopy.textContent =
-    probability >= 0.7
-      ? "Conviene revisar mora y capacidad de pago antes de aprobar."
-      : probability >= 0.4
-        ? "Perfil intermedio con senales que requieren seguimiento."
-        : "Perfil con menor riesgo relativo segun los datos ingresados.";
+  riskLabel.textContent = t(riskLabelKey(probability));
+  riskCopy.textContent = t(riskCopyKey(probability));
   modelMode.textContent = `${data.model_name} | ${data.mode}`;
 
   const notes = data.explanation
+    .map((item) => (currentLanguage === "en" ? explanationTranslations[item] || item : item))
     .map((item) => `<li>${item}</li>`)
     .join("");
   resultNotes.innerHTML = `
-    <p><strong>Prediccion:</strong> ${data.prediction ? "incumplimiento probable" : "sin incumplimiento probable"} con umbral ${formatPercent(data.threshold)}.</p>
+    <p><strong>${t("prediction")}:</strong> ${
+      data.prediction ? t("probable_default") : t("no_probable_default")
+    } ${t("with_threshold")} ${formatPercent(data.threshold)}.</p>
     <ul>${notes}</ul>
   `;
+}
+
+function setRiskState(probability, label, data) {
+  lastPrediction = { probability, label, data };
+  renderRiskState();
 }
 
 async function checkHealth() {
@@ -425,9 +860,9 @@ async function checkHealth() {
     const response = await fetch(`${backendUrl}/health`);
     if (!response.ok) throw new Error("health");
     const data = await response.json();
-    setStatus("is-ok", `API ${data.status} | ${data.model_mode}`);
+    setStatusKey("is-ok", "api_ok", { status: data.status, mode: data.model_mode });
   } catch {
-    setStatus("is-error", "API no disponible");
+    setStatusKey("is-error", "api_unavailable");
   }
 }
 
@@ -436,9 +871,10 @@ async function submitPrediction(event) {
   updateSnapshot();
   const payload = getPayload();
 
+  isSubmitting = true;
   submitButton.disabled = true;
-  submitButton.textContent = "Calculando...";
-  resultNotes.innerHTML = "<p>Procesando perfil financiero...</p>";
+  submitButton.textContent = t("calculating");
+  resultNotes.innerHTML = `<p>${t("processing_profile")}</p>`;
 
   try {
     const response = await fetch(`${backendUrl}/predict`, {
@@ -452,15 +888,17 @@ async function submitPrediction(event) {
     setRiskState(Number(data.probability), data.risk_label, data);
     fetchProgramReport("pdf", { preview: true });
   } catch {
+    lastPrediction = null;
     riskMeter.classList.remove("risk-low", "risk-medium", "risk-high");
     gaugeValue.textContent = "--";
-    riskLabel.textContent = "Sin conexion";
-    riskCopy.textContent = "No se pudo consultar la API de Render.";
+    riskLabel.textContent = t("no_connection");
+    riskCopy.textContent = t("render_connection_error");
     modelMode.textContent = "Error";
-    resultNotes.innerHTML = "<p>Revisa que el backend de Render este activo y vuelve a intentar.</p>";
+    resultNotes.innerHTML = `<p>${t("check_backend")}</p>`;
   } finally {
+    isSubmitting = false;
     submitButton.disabled = false;
-    submitButton.textContent = "Calcular riesgo";
+    submitButton.textContent = t("calculate_risk");
   }
 }
 
@@ -471,17 +909,144 @@ function activateScenario(name) {
   setPayload(scenarios[name]);
 }
 
+function modelTypeLabel(model) {
+  const rawType = currentLanguage === "en" ? model.type_en : model.type;
+  return rawType === "hybrid" || rawType === "hibrido" ? t("model_type_hybrid") : t("model_type_classic");
+}
+
+function validationSummary(test) {
+  if (!test) return t("no_interpretation");
+  const tP = Number(test.paired_t_pvalue);
+  const wP = Number(test.wilcoxon_pvalue);
+  const tSig = Number.isFinite(tP) && tP < 0.05;
+  const wSig = Number.isFinite(wP) && wP < 0.05;
+
+  if (currentLanguage === "es" && test.interpretation) return test.interpretation;
+  if (tSig && wSig) return `${t("significant_both")} t=${formatDecimal(tP)}, W=${formatDecimal(wP)}.`;
+  if (tSig) return `${t("significant_t")} t=${formatDecimal(tP)}, W=${formatDecimal(wP)}.`;
+  if (wSig) return `${t("significant_w")} t=${formatDecimal(tP)}, W=${formatDecimal(wP)}.`;
+  return `${t("not_significant")} t=${formatDecimal(tP)}, W=${formatDecimal(wP)}.`;
+}
+
+function renderStatistics() {
+  if (!modelGrid || !statsTableBody) return;
+  if (!latestStats) return;
+
+  const comparison = latestStats.comparison || [];
+  const tests = latestStats.statistical_tests || [];
+  const comparisonByModel = new Map(comparison.map((row) => [row.model, row]));
+  const testsByModel = new Map(tests.map((row) => [row.model, row]));
+  productionModel.textContent = latestStats.production_model || "LSTM";
+
+  modelGrid.innerHTML = (latestStats.model_catalog || [])
+    .map((model) => {
+      const metrics = comparisonByModel.get(model.name);
+      const description = currentLanguage === "en" ? model.description_en : model.description;
+      const selectedClass = model.name === latestStats.production_model ? " is-selected" : "";
+      return `
+        <article class="model-card${selectedClass}">
+          <div>
+            <span>${modelTypeLabel(model)}</span>
+            <strong>${model.name.replaceAll("_", "-")}</strong>
+          </div>
+          <p>${description}</p>
+          <dl>
+            <div><dt>${t("auc_label")}</dt><dd>${formatDecimal(metrics?.roc_auc_mean, 3)}</dd></div>
+            <div><dt>${t("f1_label")}</dt><dd>${formatDecimal(metrics?.f1_mean, 3)}</dd></div>
+          </dl>
+        </article>
+      `;
+    })
+    .join("");
+
+  statsTableBody.innerHTML = comparison
+    .map((row) => {
+      const isSelected = row.model === latestStats.production_model;
+      return `
+        <tr>
+          <td>${row.model.replaceAll("_", "-")}${isSelected ? " *" : ""}</td>
+          <td>${formatDecimal(row.roc_auc_mean, 3)}</td>
+          <td>${formatDecimal(row.f1_mean, 3)}</td>
+          <td>${formatDecimal(row.fit_seconds_mean, 2)}s</td>
+          <td>${isSelected ? t("selected_model") : validationSummary(testsByModel.get(row.model))}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+async function loadStatistics() {
+  if (!statsTableBody) return;
+  statsTableBody.innerHTML = `<tr><td colspan="5">${t("stats_loading")}</td></tr>`;
+  refreshStatsButton.disabled = true;
+  try {
+    const response = await fetch(`${backendUrl}/statistics/validation`);
+    if (!response.ok) throw new Error("statistics");
+    latestStats = await response.json();
+    renderStatistics();
+  } catch {
+    statsTableBody.innerHTML = `<tr><td colspan="5">${t("stats_error")}</td></tr>`;
+  } finally {
+    refreshStatsButton.disabled = false;
+  }
+}
+
+function addChatMessage(message, type) {
+  const bubble = document.createElement("div");
+  bubble.className = `chat-message ${type}`;
+  bubble.textContent = message;
+  chatMessages.appendChild(bubble);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return bubble;
+}
+
+async function submitChat(event) {
+  event.preventDefault();
+  const message = chatInput.value.trim();
+  if (!message) return;
+  addChatMessage(message, "user");
+  chatInput.value = "";
+  const pending = addChatMessage(t("chat_typing"), "bot");
+
+  try {
+    const response = await fetch(`${backendUrl}/chatbot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, language: currentLanguage }),
+    });
+    if (!response.ok) throw new Error("chatbot");
+    const data = await response.json();
+    pending.textContent = data.answer;
+  } catch {
+    pending.textContent = t("chat_error");
+  }
+}
+
 renderFields();
 setPayload(baseSample);
+applyLanguage();
 checkHealth();
+loadStatistics();
 
 form.addEventListener("input", () => {
   updateSnapshot();
-  setReportStatus("Datos modificados. Genera nuevamente el reporte para actualizarlo.");
+  setReportStatusKey("report_stale");
 });
 form.addEventListener("submit", submitPrediction);
 resetButton.addEventListener("click", () => activateScenario("balanced"));
 previewReportButton.addEventListener("click", () => fetchProgramReport("pdf", { preview: true }));
+languageToggle.addEventListener("click", () => {
+  currentLanguage = currentLanguage === "es" ? "en" : "es";
+  localStorage.setItem("afi_language", currentLanguage);
+  applyLanguage();
+});
+themeToggle.addEventListener("click", () => {
+  currentTheme = currentTheme === "dark" ? "light" : "dark";
+  localStorage.setItem("afi_theme", currentTheme);
+  applyTheme();
+});
+refreshStatsButton.addEventListener("click", loadStatistics);
+chatForm.addEventListener("submit", submitChat);
 
 reportButtons.forEach((button) => {
   button.addEventListener("click", () => fetchProgramReport(button.dataset.reportFormat));

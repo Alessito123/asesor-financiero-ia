@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import tempfile
 from pathlib import Path
 from typing import Dict, Iterable, Optional
 
@@ -48,6 +49,10 @@ class FinancialRiskPredictor:
             return
 
         try:
+            cache_dir = Path(tempfile.gettempdir()) / "asesor_financiero_cache"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            os.environ.setdefault("MPLCONFIGDIR", str(cache_dir))
+
             import tensorflow as tf
 
             self.model = tf.keras.models.load_model(self.model_path)

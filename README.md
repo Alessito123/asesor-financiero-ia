@@ -93,6 +93,24 @@ Despliegue actual:
 El backend ya se publico en Render conectando este repositorio y usando `render.yaml`.
 La app publica tambien incluye una seccion de reportes del programa: genera con FastAPI un PDF previsualizable y descargas Word/Excel usando los datos financieros actuales del formulario. Los documentos academicos quedan como enlaces secundarios.
 
+## Cumplimiento solicitado por el docente
+
+El programa usa redes neuronales para clasificar riesgo de incumplimiento financiero. El modelo que consume la app en produccion es **LSTM**, guardado en `models/best_model.keras` y `models/best_model.h5`, para no reentrenar en cada prediccion.
+
+Modelos entrenados y comparados:
+
+- 3 modelos clasicos: `MLP`, `LSTM`, `GRU`.
+- 2 modelos hibridos: `CNN_LSTM`, `LSTM_ATTENTION`.
+
+La app publica incluye:
+
+- Dashboard con validacion despues de credenciales en Streamlit y simulador web en Vercel.
+- Tema claro/oscuro.
+- Idioma espanol/ingles.
+- Chatbot academico conectado al backend.
+- Modulo de pruebas estadisticas en FastAPI: `/statistics/validation`.
+- Reportes del programa en PDF, Word y Excel desde los datos actuales del formulario.
+
 ## Artículo científico
 
 El avance del artículo está en:

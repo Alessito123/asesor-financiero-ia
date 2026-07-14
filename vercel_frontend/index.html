@@ -12,36 +12,44 @@
         <span class="brand-mark">AI</span>
         <span>
           <strong>Asesor Financiero IA</strong>
-          <small>Riesgo crediticio personal</small>
+          <small data-i18n="brand_subtitle">Riesgo crediticio personal</small>
         </span>
       </a>
       <div class="header-actions">
         <div class="api-status" id="status" aria-live="polite">
           <span class="status-dot"></span>
-          <span>Conectando API</span>
+          <span data-i18n="api_connecting">Conectando API</span>
         </div>
         <a class="ghost-link" href="https://asesor-financiero-api-wnyk.onrender.com/docs" target="_blank" rel="noreferrer">
           Swagger
         </a>
-        <a class="ghost-link" href="#reportes">
+        <a class="ghost-link" href="#modelos" data-i18n="nav_models">
+          Modelos
+        </a>
+        <a class="ghost-link" href="#reportes" data-i18n="nav_reports">
           Reportes
         </a>
+        <a class="ghost-link" href="#chatbot" data-i18n="nav_chat">
+          Chatbot
+        </a>
+        <button class="ghost-link header-button" id="language-toggle" type="button">EN</button>
+        <button class="ghost-link header-button" id="theme-toggle" type="button" data-i18n="theme_dark">Oscuro</button>
       </div>
     </header>
 
     <main class="shell" id="simulador">
       <section class="overview" aria-labelledby="page-title">
         <div class="title-block">
-          <p class="eyebrow">FastAPI + IA financiera</p>
-          <h1 id="page-title">Evalua el riesgo de incumplimiento con datos de credito.</h1>
+          <p class="eyebrow" data-i18n="overview_eyebrow">FastAPI + IA financiera</p>
+          <h1 id="page-title" data-i18n="page_title">Evalua el riesgo de incumplimiento con datos de credito.</h1>
         </div>
         <div class="metrics-strip" aria-label="Resumen del sistema">
           <div>
-            <span>Backend</span>
+            <span data-i18n="metric_backend">Backend</span>
             <strong>Render</strong>
           </div>
           <div>
-            <span>Frontend</span>
+            <span data-i18n="metric_frontend">Frontend</span>
             <strong>Vercel</strong>
           </div>
           <div>
@@ -55,40 +63,40 @@
         <form class="form-panel" id="risk-form">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">Simulador</p>
-              <h2>Perfil del cliente</h2>
+              <p class="eyebrow" data-i18n="simulator_eyebrow">Simulador</p>
+              <h2 data-i18n="client_profile">Perfil del cliente</h2>
             </div>
-            <button class="secondary-button" id="reset-button" type="button">Restablecer</button>
+            <button class="secondary-button" id="reset-button" type="button" data-i18n="reset">Restablecer</button>
           </div>
-          <p class="currency-note">Todos los montos monetarios se ingresan en soles peruanos (S/).</p>
+          <p class="currency-note" data-i18n="currency_note">Todos los montos monetarios se ingresan en soles peruanos (S/).</p>
 
           <div class="scenario-tabs" aria-label="Escenarios rapidos">
-            <button class="scenario-button is-active" type="button" data-scenario="balanced">Perfil actual</button>
-            <button class="scenario-button" type="button" data-scenario="healthy">Cliente estable</button>
-            <button class="scenario-button" type="button" data-scenario="alert">Mora elevada</button>
+            <button class="scenario-button is-active" type="button" data-scenario="balanced" data-i18n="scenario_current">Perfil actual</button>
+            <button class="scenario-button" type="button" data-scenario="healthy" data-i18n="scenario_healthy">Cliente estable</button>
+            <button class="scenario-button" type="button" data-scenario="alert" data-i18n="scenario_alert">Mora elevada</button>
           </div>
 
           <fieldset class="form-section">
-            <legend>Datos personales</legend>
+            <legend data-i18n="personal_data">Datos personales</legend>
             <div class="field-grid" id="profile-fields"></div>
           </fieldset>
 
           <fieldset class="form-section">
-            <legend>Historial de pago</legend>
+            <legend data-i18n="payment_history">Historial de pago</legend>
             <div class="field-grid compact" id="payment-history-fields"></div>
           </fieldset>
 
           <fieldset class="form-section">
-            <legend>Saldos facturados en S/</legend>
+            <legend data-i18n="billed_balances">Saldos facturados en S/</legend>
             <div class="field-grid compact" id="bill-fields"></div>
           </fieldset>
 
           <fieldset class="form-section">
-            <legend>Pagos realizados en S/</legend>
+            <legend data-i18n="payments_done">Pagos realizados en S/</legend>
             <div class="field-grid compact" id="payment-amount-fields"></div>
           </fieldset>
 
-          <button class="primary-button" id="submit-button" type="submit">
+          <button class="primary-button" id="submit-button" type="submit" data-i18n="calculate_risk">
             Calcular riesgo
           </button>
         </form>
@@ -96,10 +104,10 @@
         <aside class="insight-panel" aria-live="polite">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">Resultado</p>
-              <h2>Lectura del modelo</h2>
+              <p class="eyebrow" data-i18n="result_eyebrow">Resultado</p>
+              <h2 data-i18n="model_reading">Lectura del modelo</h2>
             </div>
-            <span class="mode-pill" id="model-mode">Sin calculo</span>
+            <span class="mode-pill" id="model-mode" data-i18n="no_calculation">Sin calculo</span>
           </div>
 
           <div class="risk-meter" id="risk-meter" data-state="empty">
@@ -107,62 +115,105 @@
               <span id="gauge-value">--</span>
             </div>
             <div>
-              <p class="risk-label" id="risk-label">Esperando datos</p>
-              <p class="risk-copy" id="risk-copy">Completa el perfil y ejecuta la prediccion.</p>
+              <p class="risk-label" id="risk-label" data-i18n="waiting_data">Esperando datos</p>
+              <p class="risk-copy" id="risk-copy" data-i18n="waiting_copy">Completa el perfil y ejecuta la prediccion.</p>
             </div>
           </div>
 
           <div class="snapshot" aria-label="Indicadores calculados">
             <div>
-              <span>Uso promedio</span>
+              <span data-i18n="avg_usage">Uso promedio</span>
               <strong id="usage-value">--</strong>
             </div>
             <div>
-              <span>Pago / saldo</span>
+              <span data-i18n="coverage">Pago / saldo</span>
               <strong id="coverage-value">--</strong>
             </div>
             <div>
-              <span>Mora maxima</span>
+              <span data-i18n="max_delay">Mora maxima</span>
               <strong id="delay-value">--</strong>
             </div>
           </div>
 
           <div class="flow-card">
             <div class="flow-head">
-              <span>Saldos vs pagos</span>
+              <span data-i18n="balances_vs_payments">Saldos vs pagos</span>
               <strong id="flow-total">--</strong>
             </div>
             <svg class="flow-chart" id="flow-chart" viewBox="0 0 420 132" role="img" aria-label="Grafico de saldos y pagos por mes"></svg>
           </div>
 
           <div class="notes" id="result-notes">
-            <p>La explicacion del modelo aparecera aqui despues de calcular.</p>
+            <p data-i18n="model_explanation_pending">La explicacion del modelo aparecera aqui despues de calcular.</p>
           </div>
         </aside>
+      </section>
+
+      <section class="models-panel" id="modelos" aria-labelledby="models-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow" data-i18n="models_eyebrow">Validacion IA</p>
+            <h2 id="models-title" data-i18n="models_title">Modelos neuronales y pruebas estadisticas</h2>
+          </div>
+          <button class="secondary-button" id="refresh-stats-button" type="button" data-i18n="refresh_stats">Actualizar pruebas</button>
+        </div>
+        <div class="model-summary" id="model-summary">
+          <div>
+            <span data-i18n="production_model">Modelo en produccion</span>
+            <strong id="production-model">LSTM</strong>
+          </div>
+          <div>
+            <span data-i18n="classic_models">Modelos clasicos</span>
+            <strong>MLP, LSTM, GRU</strong>
+          </div>
+          <div>
+            <span data-i18n="hybrid_models">Modelos hibridos</span>
+            <strong>CNN-LSTM, LSTM-Attention</strong>
+          </div>
+        </div>
+        <div class="model-grid" id="model-grid"></div>
+        <div class="stats-table-wrap">
+          <table class="stats-table" aria-label="Pruebas estadisticas">
+            <thead>
+              <tr>
+                <th data-i18n="table_model">Modelo</th>
+                <th>AUC</th>
+                <th>F1</th>
+                <th data-i18n="table_time">Tiempo</th>
+                <th data-i18n="table_validation">Validacion</th>
+              </tr>
+            </thead>
+            <tbody id="stats-table-body">
+              <tr>
+                <td colspan="5" data-i18n="stats_loading">Cargando pruebas estadisticas...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section class="reports-panel" id="reportes" aria-labelledby="reports-title">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Programa</p>
-            <h2 id="reports-title">Reporte del analisis financiero</h2>
+            <p class="eyebrow" data-i18n="program_eyebrow">Programa</p>
+            <h2 id="reports-title" data-i18n="financial_report_title">Reporte del analisis financiero</h2>
           </div>
-          <button class="primary-link" id="preview-report-button" type="button">Previsualizar PDF</button>
+          <button class="primary-link" id="preview-report-button" type="button" data-i18n="preview_pdf">Previsualizar PDF</button>
         </div>
 
         <div class="report-layout">
           <div class="report-preview" id="program-report-preview">
             <div class="report-preview-head">
-              <span>Vista previa</span>
-              <strong id="report-preview-title">Reporte financiero</strong>
+              <span data-i18n="preview">Vista previa</span>
+              <strong id="report-preview-title" data-i18n="financial_report">Reporte financiero</strong>
             </div>
             <iframe
               id="program-report-frame"
               title="Vista previa del reporte financiero del programa"
             ></iframe>
             <div class="report-empty" id="report-empty">
-              <strong>Sin reporte generado</strong>
-              <span>Calcula el riesgo o previsualiza el PDF con los datos actuales.</span>
+              <strong data-i18n="no_report">Sin reporte generado</strong>
+              <span data-i18n="no_report_hint">Calcula el riesgo o previsualiza el PDF con los datos actuales.</span>
             </div>
           </div>
 
@@ -170,30 +221,30 @@
             <button class="report-row" type="button" data-report-format="pdf">
               <span class="file-badge">PDF</span>
               <span>
-                <strong>Reporte financiero</strong>
-                <small>Resultado, indicadores y recomendaciones.</small>
+                <strong data-i18n="financial_report">Reporte financiero</strong>
+                <small data-i18n="pdf_report_desc">Resultado, indicadores y recomendaciones.</small>
               </span>
             </button>
             <button class="report-row" type="button" data-report-format="docx">
               <span class="file-badge">DOCX</span>
               <span>
-                <strong>Reporte editable</strong>
-                <small>Word generado desde la prediccion actual.</small>
+                <strong data-i18n="editable_report">Reporte editable</strong>
+                <small data-i18n="docx_report_desc">Word generado desde la prediccion actual.</small>
               </span>
             </button>
             <button class="report-row" type="button" data-report-format="xlsx">
               <span class="file-badge">XLSX</span>
               <span>
-                <strong>Tabla del analisis</strong>
-                <small>Excel con resultado, indicadores y variables.</small>
+                <strong data-i18n="analysis_table">Tabla del analisis</strong>
+                <small data-i18n="xlsx_report_desc">Excel con resultado, indicadores y variables.</small>
               </span>
             </button>
-            <p class="report-status" id="report-status">Listo para generar con los datos del formulario.</p>
+            <p class="report-status" id="report-status" data-i18n="report_ready">Listo para generar con los datos del formulario.</p>
           </div>
         </div>
 
         <details class="academic-docs">
-          <summary>Documentos academicos del proyecto</summary>
+          <summary data-i18n="academic_docs">Documentos academicos del proyecto</summary>
           <div class="academic-links">
             <a href="./reports/reporte_modelos.pdf" download>Reporte de modelos PDF</a>
             <a href="./reports/reporte_modelos.docx" download>Reporte de modelos Word</a>
@@ -202,6 +253,23 @@
             <a href="./reports/entrega_final_asesor_financiero_ia.docx" download>Evidencia de entrega</a>
           </div>
         </details>
+      </section>
+
+      <section class="chat-panel" id="chatbot" aria-labelledby="chat-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow" data-i18n="chat_eyebrow">Asistente</p>
+            <h2 id="chat-title" data-i18n="chat_title">Chatbot del asesor financiero</h2>
+          </div>
+          <span class="mode-pill" data-i18n="chat_mode">Soporte academico</span>
+        </div>
+        <div class="chat-box" id="chat-messages" aria-live="polite">
+          <div class="chat-message bot" data-i18n="chat_welcome">Hola, puedo explicar el modelo LSTM, los 5 modelos entrenados, reportes y pruebas estadisticas.</div>
+        </div>
+        <form class="chat-form" id="chat-form">
+          <input id="chat-input" type="text" maxlength="600" data-i18n-placeholder="chat_placeholder" placeholder="Pregunta sobre modelos, reportes o riesgo" />
+          <button class="primary-link" type="submit" data-i18n="send">Enviar</button>
+        </form>
       </section>
     </main>
 

@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from ml.predictor import FinancialRiskPredictor
 from ml.schema import DEFAULT_SAMPLE, FEATURE_COLUMNS
+from ml.statistical_validation import statistical_validation_summary
 
 
 class PredictionRequest(BaseModel):
@@ -53,6 +54,17 @@ class PredictionResponse(BaseModel):
     prediction: int
     explanation: List[str]
     model_name: str
+
+
+class ChatbotRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=600)
+    language: str = Field("es", pattern="^(es|en)$")
+
+
+class ChatbotResponse(BaseModel):
+    answer: str
+    language: str
+    topics: List[str]
 
 
 app = FastAPI(
@@ -384,6 +396,71 @@ def report_response(content: bytes, filename: str, media_type: str, inline: bool
     )
 
 
+def chatbot_answer(message: str, language: str) -> Dict:
+    text = message.lower()
+    stats = statistical_validation_summary()
+    topics: List[str] = []
+
+    if any(word in text for word in ["modelo", "model", "lstm", "red", "neural"]):
+        topics.append("models")
+        if language == "en":
+            answer = (
+                "The program uses LSTM in production because it was selected as the best saved model "
+                "after comparing 3 classic neural models (MLP, LSTM, GRU) and 2 hybrid models "
+                "(CNN-LSTM and LSTM-Attention). The selection criterion is mainly cross-validation AUC-ROC."
+            )
+        else:
+            answer = (
+                "El programa usa LSTM en produccion porque fue seleccionado como el mejor modelo guardado "
+                "tras comparar 3 modelos clasicos de redes neuronales (MLP, LSTM, GRU) y 2 modelos hibridos "
+                "(CNN-LSTM y LSTM-Attention). El criterio principal es AUC-ROC en validacion cruzada."
+            )
+    elif any(word in text for word in ["estad", "stat", "wilcoxon", "t-test", "valid"]):
+        topics.append("statistics")
+        tests = stats.get("statistical_tests", [])
+        if language == "en":
+            answer = (
+                f"The statistical validation module reads {len(tests)} paired comparisons. "
+                "It uses paired t-test and Wilcoxon over fold AUC values to verify whether model differences "
+                "are robust at the 5% significance level."
+            )
+        else:
+            answer = (
+                f"El modulo de pruebas estadisticas lee {len(tests)} comparaciones pareadas. "
+                "Usa t-test pareado y Wilcoxon sobre el AUC por fold para validar si las diferencias "
+                "entre modelos son robustas al 5% de significancia."
+            )
+    elif any(word in text for word in ["reporte", "report", "pdf", "word", "excel"]):
+        topics.append("reports")
+        answer = (
+            "You can generate PDF, Word and Excel reports from the current financial form. "
+            "The PDF can be previewed on screen before download."
+            if language == "en"
+            else "Puedes generar reportes PDF, Word y Excel con los datos financieros actuales del formulario. "
+            "El PDF se puede previsualizar en pantalla antes de descargarlo."
+        )
+    elif any(word in text for word in ["riesgo", "risk", "mora", "pago", "saldo"]):
+        topics.append("risk")
+        answer = (
+            "The risk score combines the trained neural model with the user's credit limit, payment delays, "
+            "billed balances and payments. Higher late payments and low payment coverage increase risk."
+            if language == "en"
+            else "El riesgo combina el modelo neuronal entrenado con limite de credito, mora, saldos facturados "
+            "y pagos realizados. Mayor mora y baja cobertura de pago elevan el riesgo."
+        )
+    else:
+        topics.append("help")
+        answer = (
+            "I can help with the selected neural model, reports, statistical validation, risk interpretation, "
+            "and the Render/Vercel deployment."
+            if language == "en"
+            else "Puedo ayudarte con el modelo neuronal seleccionado, reportes, validacion estadistica, "
+            "interpretacion del riesgo y despliegue en Render/Vercel."
+        )
+
+    return {"answer": answer, "language": language, "topics": topics}
+
+
 @app.get("/")
 def root() -> Dict[str, str]:
     return {
@@ -406,6 +483,16 @@ def model_info() -> Dict:
         "metadata": predictor.metadata,
         "sample_payload": DEFAULT_SAMPLE,
     }
+
+
+@app.get("/statistics/validation")
+def statistics_validation() -> Dict:
+    return statistical_validation_summary()
+
+
+@app.post("/chatbot", response_model=ChatbotResponse)
+def chatbot(request: ChatbotRequest) -> Dict:
+    return chatbot_answer(request.message, request.language)
 
 
 @app.post("/predict", response_model=PredictionResponse)

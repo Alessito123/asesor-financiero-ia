@@ -41,6 +41,7 @@ outputs/*
 *.tmp
 *.bak
 ~$*.docx
+paquetes_entrega/
 
 .DS_Store
 Thumbs.db
