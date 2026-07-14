@@ -44,7 +44,6 @@ const chatMessages = document.querySelector("#chat-messages");
 const chatPanel = document.querySelector("#chatbot");
 const chatLauncher = document.querySelector("#chat-launcher");
 const chatClose = document.querySelector("#chat-close");
-const chatPromptButtons = document.querySelectorAll("[data-chat-prompt-key]");
 const toastStack = document.querySelector("#toast-stack");
 const navLinks = document.querySelectorAll('.ghost-link[href^="#"]');
 const profileNameInput = document.querySelector("#profile-name-input");
@@ -1827,6 +1826,13 @@ function submitPromptQuestion(promptKey) {
   submitChat({ preventDefault() {} });
 }
 
+function handleChatPromptClick(event) {
+  const button = event.target.closest("[data-chat-prompt-key]");
+  if (!button) return;
+  event.preventDefault();
+  submitPromptQuestion(button.dataset.chatPromptKey);
+}
+
 function openChatDrawer() {
   chatPanel.classList.add("is-open");
   chatLauncher.setAttribute("aria-expanded", "true");
@@ -1942,9 +1948,7 @@ modelSelector.addEventListener("change", () => selectModel(modelSelector.value))
 modelGrid.addEventListener("click", handleModelGridClick);
 chatForm.addEventListener("submit", submitChat);
 chatSubmitButton.addEventListener("click", submitChat);
-chatPromptButtons.forEach((button) => {
-  button.addEventListener("click", () => submitPromptQuestion(button.dataset.chatPromptKey));
-});
+document.addEventListener("click", handleChatPromptClick);
 chatInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
     submitChat(event);
